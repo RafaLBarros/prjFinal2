@@ -1,0 +1,153 @@
+🗺️ TCC Quest Log: O Hub Modular de RPG (Local & Offline)
+Tecnologias Base:
+
+Runtime: Electron (Viabiliza o acesso a arquivos e sistema operacional).
+
+UI: React + TypeScript + TailwindCSS (ou ShadcnUI para agilidade).
+
+Build Tool: Vite (Muito mais rápido que Create-React-App).
+
+Dados: JSON System (Arquivos locais).
+
+🟢 Fase 0: O Setup (Semana 1 - Início)
+Objetivo: Ter um ambiente de desenvolvimento limpo e rodando.
+
+[X] Instalar Node.js (LTS): Garantir a versão mais estável.
+
+[X] Iniciar Projeto com Vite-Electron:
+
+Comando sugerido: npm create @quick-start/electron meu-rpg-hub (Esse template já configura React, TypeScript e a ponte do Electron automaticamente, poupando dias de configuração manual).
+
+[X] Limpeza: Apagar os arquivos de exemplo "Hello World" do template.
+
+[X] Setup de Estilização: Instalar TailwindCSS.
+
+[X] Commit Inicial: Subir o repositório no GitHub (privado ou público).
+
+🟡 Fase 1: A Ponte (Semana 1 - Fim / Semana 2)
+Objetivo: Romper a barreira do navegador. O React precisa conseguir falar com o Windows.
+
+Esta é a fase mais técnica. Se passar daqui, o resto é React puro.
+
+[ ] Estudo de IPC (Inter-Process Communication): Ler sobre ipcMain (Node) e ipcRenderer (React).
+
+[ ] Missão: O "Salvar Arquivo":
+
+Criar função no Back (Main): saveFile(conteudo, caminho).
+
+Expor essa função via preload.ts (Context Bridge).
+
+Chamar essa função no Front (React) ao clicar num botão.
+
+Critério de Sucesso: Um arquivo .json aparece na sua pasta.
+
+[ ] Missão: O "Ler Arquivo":
+
+Criar função readFile(caminho).
+
+Critério de Sucesso: O React exibe na tela o conteúdo do arquivo que você criou.
+
+[ ] Missão: O Seletor de Arquivos:
+
+Implementar dialog.showOpenDialog no Electron.
+
+Critério de Sucesso: Abre aquela janela nativa do Windows para escolher um arquivo e o programa recebe o caminho (C:\Users\Rafael\Musica.mp3).
+
+🟠 Fase 2: O Núcleo Modular (Semana 3)
+Objetivo: Criar a lógica do JSON dinâmico. Sem UI bonita ainda.
+
+[ ] Definir a Interface TypeScript (O Contrato):
+
+TypeScript
+
+type ModuleType = 'audio' | 'text' | 'pdf';
+interface Module {
+  id: string;
+  type: ModuleType;
+  active: boolean; // O toggle de liga/desliga
+  data: any; // URL do youtube, texto, caminho do PDF...
+}
+interface Scene {
+  id: string;
+  title: string;
+  modules: Module[];
+}
+[ ] Criar o "SceneRenderer" (O Factory):
+
+Um componente que recebe modules: Module[].
+
+Faz um .map() e usa um switch(module.type) para decidir se renderiza o componente de Áudio ou Texto.
+
+[ ] Criar a UI de "Adicionar Módulo":
+
+Um botão simples que adiciona um objeto vazio ao array de módulos.
+
+🔴 Fase 3: Os Módulos - Parte 1 (Semana 4 e 5)
+Objetivo: Conteúdo real. Foco em Áudio e Texto (MVP garantido).
+
+[ ] Módulo de Texto (O Escriba):
+
+Criar componente TextModule.
+
+Usar um <textarea> estilizado.
+
+Conectar o onChange para atualizar o JSON da cena.
+
+[ ] Módulo de Áudio (O Bardo Híbrido):
+
+Instalar react-player.
+
+Criar componente AudioModule.
+
+Implementar input de URL/Caminho.
+
+Teste Unitário: Colar link do YouTube -> Toca? Sim. Selecionar MP3 local -> Toca? Sim.
+
+Implementar o Toggle active: Se false, o player pausa ou fica mudo/invisível.
+
+🟣 Fase 4: O Gerenciador de Cenas (Semana 6)
+Objetivo: Navegação e Persistência.
+
+[ ] Sidebar de Navegação:
+
+Listar arquivos JSON da pasta de Cenas.
+
+[ ] State Management (Zustand):
+
+Criar store useSceneStore.
+
+Estado activeScene.
+
+[ ] Troca de Cena:
+
+Ao clicar na Sidebar -> Carrega o JSON novo -> O SceneRenderer desmonta os componentes antigos e monta os novos.
+
+Teste de Fogo: A música da cena anterior parou? A música da nova começou (se estiver ativa)?
+
+🔵 Fase 5: O Módulo Avançado (Semana 7 e 8)
+Objetivo: Leitor de PDF (O "Bonus Stage"). Se der errado, não compromete o TCC.
+
+[ ] Renderização:
+
+Instalar react-pdf.
+
+Exibir PDF local.
+
+[ ] Navegação: Botões Próxima/Anterior página.
+
+[ ] A ideia do "Recorte" (Crop):
+
+Pesquisar libs de "Screenshot" ou "Crop" em Canvas.
+
+Fallback (Plano B): Se o crop for muito difícil, permita apenas que o usuário salve "Qual página" aquele monstro está. O app só abre o PDF na página certa. Já é uma ajuda imensa.
+
+✨ Fase 6: Polimento e Documentação (Semana 9 até a Entrega)
+Objetivo: Transformar o protótipo em produto apresentável.
+
+[ ] Dark Mode: O RPGista joga no escuro. Essencial.
+
+[ ] Tratamento de Erros: O que acontece se eu apagar o arquivo MP3 do computador? O app deve mostrar "Arquivo não encontrado" em vez de tela branca.
+
+[ ] Build Final: Rodar o comando para gerar o .exe e testar em outro computador.
+
+[ ] Escrita do TCC: Tirar prints do código e das telas para o documento final.
