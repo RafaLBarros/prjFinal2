@@ -1,7 +1,55 @@
-import { app, shell, BrowserWindow, ipcMain } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
+
+import fs from 'fs/promises'
+
+// --- INÍCIO DA NOSSA API DE ARQUIVOS ---
+
+// 1. Ouvinte para SELECIONAR arquivo
+ipcMain.handle('dialog:openFile', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    properties: ['openFile'],
+    filters: [{ name: 'Textos/JSON', extensions: ['txt', 'json', 'md'] }]
+  })
+  if (canceled) return { success: false }
+  return { success: true, path: filePaths[0] }
+})
+
+// 2. Ouvinte para LER arquivo
+ipcMain.handle('fs:readFile', async (_, path) => {
+  try {
+    const content = await fs.readFile(path, 'utf-8')
+    return { success: true, content }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+})
+
+// 3. Ouvinte para SALVAR arquivo
+ipcMain.handle('fs:saveFile', async (_, { path, content }) => {
+  try {
+    await fs.writeFile(path, content, 'utf-8')
+    return { success: true }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+})
+
+// 4. Ouvinte para ESCOLHER ONDE SALVAR (Save As...)
+ipcMain.handle('dialog:saveFile', async () => {
+  const { canceled, filePath } = await dialog.showSaveDialog({
+    title: 'Salvar Cena do RPG',
+    defaultPath: 'nova-cena.json',
+    filters: [{ name: 'JSON RPG', extensions: ['json'] }]
+  });
+  
+  if (canceled) return { success: false };
+  return { success: true, path: filePath };
+});
+
+// --- FIM DA NOSSA API DE ARQUIVOS ---
 
 function createWindow(): void {
   // Create the browser window.
