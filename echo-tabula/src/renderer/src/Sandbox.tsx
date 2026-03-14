@@ -1,25 +1,24 @@
 // src/renderer/src/Sandbox.tsx
 import { useState } from 'react';
-import { RpgModule, AudioModule as AudioModuleType } from './types/rpg'; // Adicionamos a importação específica do Áudio
+import { RpgModule, AudioModule as AudioModuleType,TextModule as TextModuleType } from './types/rpg'; // Adicionamos a importação específica dos Modulos
 import { AudioModule } from './components/AudioModule';
+import { TextModule } from './components/TextModule';
 
 export function Sandbox() {
   // Criamos um dado falso (mock) apenas para testar o módulo
-  const [mockData, setMockData] = useState<AudioModuleType>({
-    id: 'teste-123',
-    name: 'Módulo de Teste',
-    type: 'audio', // Mudaremos dependendo do que estivermos testando
-    isActive: true,
-    data: {
-      urlOrPath: 'https://www.youtube.com/watch?v=jfKfPfyJRdk', // Lofi hip hop radio
-      volume: 0.5,
-      loop: true
-    }
-  });
+ const [mockData, setMockData] = useState<TextModuleType>({
+  id: 'teste-texto-1',
+  name: 'Aposentos do Rei',
+  type: 'text',
+  isActive: true,
+  data: {
+    content: "## O Baú Escondido\n\nDentro do baú vocês encontram:\n- **50** moedas de ouro\n- Uma poção de *cura* maior."
+  }
+});
 
   // A função que simula a via de mão dupla (Two-Way Data Binding)
   const handleUpdate = (id: string, updatedFields: Partial<RpgModule>) => {
-    setMockData((prev) => ({ ...prev, ...updatedFields }) as AudioModuleType);
+    setMockData((prev) => ({ ...prev, ...updatedFields }) as TextModuleType);
   };
 
   return (
@@ -28,7 +27,7 @@ export function Sandbox() {
       
       <div className="w-full max-w-xl">
         {/* Aqui plugaremos o módulo puro */}
-        <AudioModule moduleData={mockData} onUpdate={handleUpdate} />
+        <TextModule moduleData={mockData as any} onUpdate={handleUpdate} />
       </div>
 
       <div className="mt-10 w-full max-w-xl p-4 bg-black text-green-500 font-mono text-sm rounded">
