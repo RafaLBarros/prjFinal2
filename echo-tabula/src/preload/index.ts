@@ -4,9 +4,10 @@ import { electronAPI } from '@electron-toolkit/preload'
 // Custom APIs for renderer
 const api = {
   selectFile: () => ipcRenderer.invoke('dialog:openFile'),
-  chooseSavePath: () => ipcRenderer.invoke('dialog:saveFile'), // <-- NOVA LINHA
+  chooseSavePath: () => ipcRenderer.invoke('dialog:saveFile'),
   readFile: (path: string) => ipcRenderer.invoke('fs:readFile', path),
-  saveFile: (path: string, content: string) => ipcRenderer.invoke('fs:saveFile', { path, content })
+  saveFile: (path: string, content: string) => ipcRenderer.invoke('fs:saveFile', { path, content }),
+  readPdf: (path: string) => ipcRenderer.invoke('fs:readPdf', path)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

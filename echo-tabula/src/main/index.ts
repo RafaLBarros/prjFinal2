@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
@@ -26,6 +26,18 @@ ipcMain.handle('fs:readFile', async (_, path) => {
     return { success: false, error: error.message }
   }
 })
+
+// Lê o PDF ignorando o CORS e devolve como Base64 (Dados puros)
+ipcMain.handle('fs:readPdf', async (_, filePath) => {
+  try {
+    // Lê o arquivo do HD de forma binária
+    const buffer = await fs.readFile(filePath);
+    // Converte para uma string Base64 (formato seguro para trafegar para o React)
+    return { success: true, data: buffer.toString('base64') };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+});
 
 // 3. Ouvinte para SALVAR arquivo
 ipcMain.handle('fs:saveFile', async (_, { path, content }) => {
@@ -83,10 +95,12 @@ function createWindow(): void {
   }
 }
 
+
 // This method will be called when Electron has finished
 // initialization and is ready to create browser windows.
 // Some APIs can only be used after this event occurs.
 app.whenReady().then(() => {
+  
   // Set app user model id for windows
   electronApp.setAppUserModelId('com.electron')
 

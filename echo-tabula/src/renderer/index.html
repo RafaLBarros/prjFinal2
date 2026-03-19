@@ -4,9 +4,7 @@
     <meta charset="UTF-8" />
     <title>Electron</title>
     <!-- https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP -->
-    <meta http-equiv="Content-Security-Policy" 
-          content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https://www.youtube.com; media-src 'self' file: data: blob: https:;"
-          />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self' rpg:; script-src 'self'; style-src 'self' 'unsafe-inline'; frame-src 'self' https://www.youtube.com; media-src 'self' file: data: blob: https: rpg:; connect-src 'self' https: file: data: blob: rpg:;">
   </head>
 
   <body>

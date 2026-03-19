@@ -1,13 +1,16 @@
 // src/renderer/src/Sandbox.tsx
 import { useState } from 'react';
-import { RpgModule, AudioModule as AudioModuleType,TextModule as TextModuleType } from './types/rpg'; // Adicionamos a importação específica dos Modulos
+import { RpgModule, AudioModule as AudioModuleType,TextModule as TextModuleType, PdfCropModule as PdfModuleType} from './types/rpg'; // Adicionamos a importação específica dos Modulos
 import { AudioModule } from './components/AudioModule';
 import { TextModule } from './components/TextModule';
+import { PdfModule } from './components/PdfModule';
 
 export function Sandbox() {
+
   // Criamos um dado falso (mock) apenas para testar o módulo
+
     //Mock de texto
-    const [mockData, setMockData] = useState<TextModuleType>({
+    /*const [mockData, setMockData] = useState<TextModuleType>({
         id: 'teste-texto-1',
         name: 'Aposentos do Rei',
         type: 'text',
@@ -15,7 +18,8 @@ export function Sandbox() {
         data: {
         content: "<p>Comece a digitar sua aventura aqui...</p>" // <-- Mudamos para HTML simples
         }
-    });
+    });*/
+
     //Mock de audio
     /*const [mockData, setMockData] = useState<AudioModuleType>({
         id: 'teste-123',
@@ -29,9 +33,22 @@ export function Sandbox() {
         }
     });*/
 
+    //Mock de PDF
+    const [mockData, setMockData] = useState<PdfModuleType>({
+        id: 'teste-pdf-1',
+        name: 'Livro de Regras (Teste)',
+        type: 'pdf_crop',
+        isActive: true,
+        data: {
+          // Vamos usar um PDF oficial de teste da fundação Mozilla
+          filePath: 'https://raw.githubusercontent.com/mozilla/pdf.js/ba2edeae/web/compressed.tracemonkey-pldi-09.pdf',
+          page: 1
+        }
+    });
+
   // A função que simula a via de mão dupla (Two-Way Data Binding)
   const handleUpdate = (id: string, updatedFields: Partial<RpgModule>) => {
-    setMockData((prev) => ({ ...prev, ...updatedFields }) as TextModuleType);
+    setMockData((prev) => ({ ...prev, ...updatedFields }) as PdfModuleType);
   };
 
   return (
@@ -40,8 +57,8 @@ export function Sandbox() {
       
       <div className="w-full max-w-xl">
         {/* Aqui plugaremos o módulo puro */}
-        <TextModule moduleData={mockData as any} onUpdate={handleUpdate} />
-        {/*<AudioModule moduleData={mockData as any} onUpdate={handleUpdate} />*/}
+        {/*<TextModule moduleData={mockData as any} onUpdate={handleUpdate} />*/}
+        <PdfModule moduleData={mockData as any} onUpdate={handleUpdate} />
       </div>
 
       <div className="mt-10 w-full max-w-xl p-4 bg-black text-green-500 font-mono text-sm rounded">
