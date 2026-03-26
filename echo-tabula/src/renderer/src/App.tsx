@@ -1,127 +1,195 @@
 // src/renderer/src/App.tsx
 import { useState } from 'react';
-import { Scene, TextModule, RpgModule } from './types/rpg';
-import { SceneRenderer } from './components/SceneRenderer';
+import { Sidebar } from './components/Sidebar';
+import { CampaignNode } from './types/rpg';
 
-const cenaInicial: Scene = {
-  id: "cena-001",
-  title: "A Taverna do Javali",
-  description: "A festa começa aqui.",
-  modules: [] // Começamos vazio para ficar mais limpo
-};
+export default function App() {
+  // O Estado da nossa Árvore de Pastas (Exemplo Inicial)
+  const [tree, setTree] = useState<CampaignNode[]>([
+    {
+      id: 'f1', type: 'folder', name: '🗺️ Locais', isOpen: true,
+      children: [
+        { id: 's1', type: 'scene', name: 'Taverna do Javali' },
+        { id: 's2', type: 'scene', name: 'Castelo do Rei' }
+      ]
+    },
+    { id: 's3', type: 'scene', name: 'Regras da Casa' }
+  ]);
 
-function App() {
-  // 1. Colocamos a cena no Estado! Agora ela pode ser alterada e a tela vai reagir.
-  const [activeScene, setActiveScene] = useState<Scene>(cenaInicial);
+  const [activeSceneId, setActiveSceneId] = useState<string | null>('s1');
 
-  // NOVO: Controle de Arquivo e Status
-  const [currentFilePath, setCurrentFilePath] = useState<string | null>(null);
-  const [statusMsg, setStatusMsg] = useState('Cena não salva.');
+  // --- FUNÇÕES DE CONTROLE DA ÁRVORE ---
 
-  // 2. A Função Criadora (O Construtor de Módulos)
-  const handleAddTextModule = () => {
-    // Criamos um "Módulo Vazio" com um ID aleatório
-    const newTextModule: TextModule = {
-      id: `mod-texto-${Date.now()}`, // Garante um ID único usando o timestamp
-      name: "Nova Nota",
-      type: "text",
-      isActive: true,
-      data: {
-        content: ""
-      }
+  const handleToggleFolder = (targetId: string) => {
+    // Uma função recursiva para encontrar a pasta e inverter o 'isOpen' dela
+    const toggleNode = (nodes: CampaignNode[]): CampaignNode[] => {
+      return nodes.map(node => {
+        if (node.id === targetId && node.type === 'folder') {
+          return { ...node, isOpen: !node.isOpen };
+        }
+        if (node.children) {
+          return { ...node, children: toggleNode(node.children) };
+        }
+        return node;
+      });
+    };
+    setTree(toggleNode(tree));
+  };
+
+  const handleAddNode = (parentId: string | null, type: 'folder' | 'scene') => {
+    const newNode: CampaignNode = {
+      id: Math.random().toString(36).substr(2, 9),
+      type,
+      name: type === 'folder' ? 'Nova Pasta' : 'Nova Cena',
+      ...(type === 'folder' ? { isOpen: true, children: [] } : {})
     };
 
-    // Atualizamos o estado da cena, copiando tudo que ela já tinha,
-    // e adicionando o módulo novo no final do array.
-    setActiveScene((cenaAnterior) => ({
-      ...cenaAnterior,
-      modules: [...cenaAnterior.modules, newTextModule]
-    }));
-  };
-
-  // 1. A Função que atualiza qualquer módulo
-  const handleUpdateModule = (moduleId: string, updatedFields: Partial<RpgModule>) => {
-    setActiveScene((cenaAnterior) => ({
-      ...cenaAnterior,
-      modules: cenaAnterior.modules.map((mod) => 
-        // Procuramos o módulo pelo ID. Se achou, mescla os dados novos. Se não, deixa como está.
-        mod.id === moduleId ? { ...mod, ...updatedFields } as RpgModule : mod
-      )
-    }));
-  };
-
-  // A GRANDE FUNÇÃO DE SALVAR
-  const handleSaveScene = async () => {
-    setStatusMsg('Salvando...');
-    
-    // 1. Onde vamos salvar? Se for a primeira vez, pergunta ao usuário.
-    let pathToSave = currentFilePath;
-    if (!pathToSave) {
-      const dialogResult = await window.api.chooseSavePath();
-      if (!dialogResult.success || !dialogResult.path) {
-        setStatusMsg('Salvamento cancelado.');
-        return;
-      }
-      pathToSave = dialogResult.path;
-      setCurrentFilePath(pathToSave);
-    }
-
-    // 2. A Mágica da Serialização: Transforma o objeto em texto JSON bonito (2 espaços)
-    const jsonString = JSON.stringify(activeScene, null, 2);
-
-    // 3. Manda para o HD!
-    const saveResult = await window.api.saveFile(pathToSave, jsonString);
-
-    if (saveResult.success) {
-      setStatusMsg('Cena salva com sucesso!');
-      setTimeout(() => setStatusMsg(`Pronto. Editando: ${pathToSave}`), 3000);
+    if (parentId === null) {
+      // Adiciona na raiz
+      setTree([...tree, newNode]);
     } else {
-      setStatusMsg('Erro ao salvar a cena.');
+      // Adiciona dentro de uma pasta específica
+      const addNodeToParent = (nodes: CampaignNode[]): CampaignNode[] => {
+        return nodes.map(node => {
+          if (node.id === parentId && node.type === 'folder') {
+            return { ...node, isOpen: true, children: [...(node.children || []), newNode] };
+          }
+          if (node.children) {
+            return { ...node, children: addNodeToParent(node.children) };
+          }
+          return node;
+        });
+      };
+      setTree(addNodeToParent(tree));
     }
+  };
+
+  // --- NOVA FUNÇÃO: DELETAR NÓ ---
+  const handleDeleteNode = (targetId: string) => {
+    const deleteFromTree = (nodes: CampaignNode[]): CampaignNode[] => {
+      return nodes
+        .filter(node => node.id !== targetId) // Se for o ID alvo, ele é excluído aqui
+        .map(node => {
+          if (node.children) {
+            return { ...node, children: deleteFromTree(node.children) }; // Vasculha as subpastas
+          }
+          return node;
+        });
+    };
+    setTree(deleteFromTree(tree));
+    if (activeSceneId === targetId) setActiveSceneId(null); // Limpa o palco se excluiu a cena atual
+  };
+
+  // --- NOVA FUNÇÃO: MOVER NÓ (DRAG & DROP) ---
+  const handleMoveNode = (draggedId: string, targetFolderId: string | null) => {
+    let draggedNode: CampaignNode | null = null;
+
+    // Etapa 1: Arranca o nó do lugar antigo e guarda na variável
+    const removeNode = (nodes: CampaignNode[]): CampaignNode[] => {
+      return nodes.filter(node => {
+        if (node.id === draggedId) {
+          draggedNode = node;
+          return false; // Remove da lista
+        }
+        if (node.children) {
+          node.children = removeNode(node.children);
+        }
+        return true;
+      });
+    };
+
+    let newTree = removeNode([...tree]);
+    if (!draggedNode) return;
+
+    // Etapa 2: Costura o nó no lugar novo
+    if (targetFolderId === null) {
+      newTree.push(draggedNode); // Soltou no vazio = Vai para a raiz
+    } else {
+      const insertNode = (nodes: CampaignNode[]): CampaignNode[] => {
+        return nodes.map(node => {
+          if (node.id === targetFolderId && node.type === 'folder') {
+            // Se achou a pasta destino, coloca o item dentro dela e garante que ela está aberta
+            return { ...node, isOpen: true, children: [...(node.children || []), draggedNode!] };
+          }
+          if (node.children) {
+            return { ...node, children: insertNode(node.children) };
+          }
+          return node;
+        });
+      };
+      newTree = insertNode(newTree);
+    }
+
+    setTree(newTree);
+  };
+
+  // --- NOVA FUNÇÃO: RENOMEAR NÓ ---
+  const handleRenameNode = (targetId: string, newName: string) => {
+    const renameInTree = (nodes: CampaignNode[]): CampaignNode[] => {
+      return nodes.map(node => {
+        if (node.id === targetId) {
+          return { ...node, name: newName }; // Atualiza o nome aqui!
+        }
+        if (node.children) {
+          return { ...node, children: renameInTree(node.children) }; // Vasculha subpastas
+        }
+        return node;
+      });
+    };
+    setTree(renameInTree(tree));
   };
 
   return (
-    
-    <div className="min-h-screen bg-slate-900 text-slate-100 p-8 flex flex-col items-center">
+    // Layout Principal: Flexbox que ocupa a tela toda (h-screen)
+    <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans">
       
-      {/* NOVO: Barra Superior do Aplicativo */}
-      <div className="w-full max-w-3xl flex justify-between items-center mb-4 bg-slate-800 p-2 rounded border border-slate-700">
-        <span className="text-xs text-slate-400 ml-2">{statusMsg}</span>
-        <button 
-          onClick={handleSaveScene}
-          className="bg-blue-600 hover:bg-blue-500 text-white font-bold py-1 px-4 rounded shadow transition text-sm"
-        >
-          💾 Salvar Cena
-        </button>
-      </div>
-      
-      {/* Cabeçalho da Cena */}
-      <header className="mb-8 border-b border-slate-700 pb-4 w-full max-w-3xl flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-amber-500">{activeScene.title}</h1>
-          <p className="text-slate-400 mt-2">{activeScene.description}</p>
+      {/* --- BARRA LATERAL (Esquerda) --- */}
+      <div className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
+        <div className="p-4 border-b border-slate-800 flex justify-between items-center">
+          <h1 className="font-bold text-emerald-500 tracking-wider text-sm uppercase">Echo Tabula</h1>
+          <div className="flex gap-1">
+            <button onClick={() => handleAddNode(null, 'folder')} className="text-slate-400 hover:text-emerald-400 p-1" title="Nova Pasta Raiz">+📂</button>
+            <button onClick={() => handleAddNode(null, 'scene')} className="text-slate-400 hover:text-emerald-400 p-1" title="Nova Cena Raiz">+📜</button>
+          </div>
         </div>
         
-        {/* O Botão Mágico */}
-        <button 
-          onClick={handleAddTextModule}
-          className="bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded shadow transition"
+        {/* A área da lista recebe eventos de Drop para enviar arquivos para a Raiz */}
+        <div 
+          className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-slate-700 h-full"
+          onDragOver={(e) => e.preventDefault()}
+          onDrop={(e) => {
+            e.preventDefault();
+            const draggedId = e.dataTransfer.getData('nodeId');
+            if(draggedId) handleMoveNode(draggedId, null); // Envia para a raiz
+          }}
         >
-          + Adicionar Texto
-        </button>
-      </header>
+          <Sidebar 
+            nodes={tree} 
+            activeSceneId={activeSceneId}
+            onSelectScene={setActiveSceneId}
+            onToggleFolder={handleToggleFolder}
+            onAddNode={handleAddNode}
+            onDeleteNode={handleDeleteNode}
+            onMoveNode={handleMoveNode}
+            onRenameNode={handleRenameNode} // <-- A nova propriedade plugada aqui!
+          />
+        </div>
+      </div>
 
-      {/* O Renderizador recebe o array dinâmico agora */}
-      <main className="w-full max-w-3xl">
-        {/* 2. Passamos a função como 'prop' para o Renderizador */}
-        <SceneRenderer 
-           modules={activeScene.modules} 
-           onUpdateModule={handleUpdateModule} 
-        />
-      </main>
+      {/* --- PALCO PRINCIPAL (Direita) --- */}
+      <div className="flex-1 flex flex-col overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-opacity-5">
+        <div className="flex-1 flex items-center justify-center">
+          {activeSceneId ? (
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-slate-500 mb-2">Cena Selecionada: {activeSceneId}</h2>
+              <p className="text-slate-600">O Gerenciador de Módulos entrará aqui no próximo passo!</p>
+            </div>
+          ) : (
+            <p className="text-slate-600 italic">Selecione uma cena no menu lateral para começar.</p>
+          )}
+        </div>
+      </div>
 
     </div>
   );
 }
-
-export default App;
