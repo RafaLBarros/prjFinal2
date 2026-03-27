@@ -66,10 +66,12 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
   if (!moduleData.isActive) return null;
 
   return (
-    <div className="border border-slate-700 bg-slate-800 p-4 rounded-md shadow-md mb-4 focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
+    // REMOVEMOS o p-4 do contêiner externo para padronizar
+    <div className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
       
-      {/* --- CABEÇALHO E CONTROLES DE EDIÇÃO (Iguais aos de antes) --- */}
-      <div className="flex justify-between items-center mb-3">
+      {/* --- CABEÇALHO PADRONIZADO E ALINHADO --- */}
+      <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
+        
         <div className="flex items-center gap-2 flex-1">
           <span className="text-blue-400">🎵</span>
           <input 
@@ -80,20 +82,30 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
             placeholder="Nome da Trilha (Ex: Música de Batalha)"
           />
         </div>
+
         {/* BOTÃO DE MINIMIZAR AQUI */}
-        <button onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })} className="text-slate-500 hover:text-blue-400 px-2 py-1 rounded transition text-sm font-bold">
+        <button 
+          onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })} 
+          className="text-slate-500 hover:text-blue-400 px-2 py-1 rounded transition text-sm font-bold"
+          title={moduleData.isMinimized ? "Expandir" : "Minimizar"}
+        >
           {moduleData.isMinimized ? '▼' : '▲'}
         </button>
+
+        {/* BOTÃO DE CONFIGURAR (Note o ml-2 no final das classes para dar o espaçamento correto) */}
         <button 
           onClick={() => setIsEditing(!isEditing)}
-          className="text-slate-400 hover:text-white text-sm bg-slate-700 px-2 py-1 rounded"
+          className="text-slate-400 hover:text-white text-sm bg-slate-700 px-2 py-1 rounded ml-2"
         >
-          {isEditing ? 'Ocultar Configurações' : '⚙️ Configurar'}
+          {isEditing ? 'Ocultar Config' : '⚙️ Configurar'}
         </button>
+
       </div>
-      {/* --- CONTEÚDO VISUAL (ESCONDE QUANDO MINIMIZADO) --- */}
+
+      
+      {/* --- CONTEÚDO VISUAL (Adicionamos p-4 aqui para compensar a remoção externa) --- */}
       {!moduleData.isMinimized && (
-        <>
+        <div className="p-4 flex flex-col gap-3">
           {isEditing && (
             <div className="bg-slate-900 p-3 rounded mb-3 border border-slate-700 space-y-3">
               <div>
@@ -153,7 +165,7 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
               </p>
             </div>
           </div>
-        </>
+        </div>
       )}
 
           {/* --- O MOTOR NATIVO INVISÍVEL --- */}
