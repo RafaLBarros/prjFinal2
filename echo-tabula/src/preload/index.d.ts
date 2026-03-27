@@ -9,6 +9,13 @@ declare global {
       readFile: (path: string) => Promise<{ success: boolean; content?: string; error?: string }>
       saveFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>
       importAsset: () => Promise<{ success: boolean; fileName?: string; error?: string }>
+
+      // --- NOVAS FUNÇÕES (Cofre de Campanhas) ---
+      listCampaigns: () => Promise<{ success: boolean; files: string[]; error?: string }>;
+      saveCampaign: (fileName: string, content: string) => Promise<{ success: boolean; fileName?: string; error?: string }>;
+      loadCampaign: (fileName: string) => Promise<{ success: boolean; content?: string; error?: string }>;
+      deleteCampaign: (fileName: string) => Promise<{ success: boolean; error?: string }>;
+      renameCampaign: (oldName: string, newName: string) => Promise<{ success: boolean; fileName?: string; error?: string }>;
     }
   }
 }

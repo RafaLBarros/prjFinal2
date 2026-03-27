@@ -3,7 +3,7 @@ import { CampaignNode, RpgModule, TextModule as TextType, AudioModule as AudioTy
 import { TextModule } from './TextModule';
 import { AudioModule } from './AudioModule';
 import { PdfModule } from './PdfModule';
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 
 interface Props {
   scene: CampaignNode;
@@ -50,9 +50,28 @@ export function SceneManager({ scene, onUpdateModules, onRenameScene }: Props) {
   };
 
   // --- ESTADOS DO DRAG & DROP ---
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [draggableModuleId, setDraggableModuleId] = useState<string | null>(null);
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
+
+  // --- NOVA FUNÇÃO: AUTO-SCROLL NAS BORDAS ---
+  const handleAutoScroll = (clientY: number) => {
+    const container = scrollContainerRef.current;
+    if (!container) return;
+
+    // Pega as medidas exatas da div na tela do monitor
+    const { top, bottom } = container.getBoundingClientRect();
+    const threshold = 80; // A zona de ativação (80px perto da borda)
+    const scrollSpeed = 8; // Velocidade da rolagem (aumente se quiser mais rápido)
+
+    if (clientY < top + threshold) {
+      container.scrollTop -= scrollSpeed; // Rola para cima
+    } else if (clientY > bottom - threshold) {
+      container.scrollTop += scrollSpeed; // Rola para baixo
+    }
+  };
+
 
   // --- NOVA FUNÇÃO: REORDENAR MÓDULOS ---
   const handleReorderModules = (draggedId: string, targetId: string, position: 'before' | 'after') => {
@@ -95,7 +114,14 @@ return (
       </div>
 
       {/* ÁREA DE MÓDULOS RENDERIZADOS */}
-      <div className="flex-1 overflow-y-auto pt-6 pl-10 lg:pl-16 pr-4 lg:pr-8 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 pb-32">
+      <div 
+        ref={scrollContainerRef} // <-- A REF PLUGADA AQUI
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (draggableModuleId) handleAutoScroll(e.clientY); // Escuta o scroll no fundo vazio
+        }}
+        className="flex-1 overflow-y-auto pt-6 pl-10 lg:pl-16 pr-4 lg:pr-8 space-y-8 scrollbar-thin scrollbar-thumb-slate-700 pb-32"
+      >
         {modules.length === 0 ? (
           <div className="text-center py-20 text-slate-600 border-2 border-dashed border-slate-700 rounded-xl transition-all hover:border-slate-600 hover:bg-slate-800/20">
             <p className="text-lg">O palco está vazio.</p>
@@ -105,7 +131,6 @@ return (
           modules.map(mod => (
             <div 
               key={mod.id} 
-              // A MÁGICA: O módulo só é arrastável se o mouse estiver em cima da alça!
               draggable={draggableModuleId === mod.id}
               onDragStart={(e) => {
                 e.stopPropagation();
@@ -114,7 +139,9 @@ return (
               onDragOver={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // Calcula se o mouse está na metade de cima ou de baixo do módulo
+
+                handleAutoScroll(e.clientY);
+
                 const rect = e.currentTarget.getBoundingClientRect();
                 const y = e.clientY - rect.top;
                 if (y < rect.height / 2) {
@@ -135,46 +162,58 @@ return (
                 if (draggedId && draggedId !== mod.id && dropPosition) {
                   handleReorderModules(draggedId, mod.id, dropPosition);
                 }
-                // Limpa os estados visuais após soltar
                 setDropTargetId(null);
                 setDropPosition(null);
                 setDraggableModuleId(null);
               }}
-              className={`relative group transition-all duration-300 rounded-lg -ml-10 lg:-ml-16 ${
-                // Feedback visual de onde o módulo vai cair (Sombra verde em cima ou embaixo)
+              // 1. A MÁGICA DO FLEXBOX: Coloca a alça e o módulo lado a lado (gap-2)
+              className={`flex items-start gap-2 group transition-all duration-300 rounded-lg ${
                 dropTargetId === mod.id && dropPosition === 'before' ? 'shadow-[0_-4px_0_0_#10b981] mt-4' : ''
               } ${
                 dropTargetId === mod.id && dropPosition === 'after' ? 'shadow-[0_4px_0_0_#10b981] mb-4' : ''
-              } hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10`}
+              }`}
             >
               
-              {/* --- A ALÇA DE ARRASTAR (GRIP) --- */}
+              {/* --- A ALÇA DE ARRASTAR (GRIP) ATUALIZADA (6 PONTOS) --- */}
+              {/* Mantemos o container Flexbox externo, mas mudamos o interno */}
               <div 
                 onMouseEnter={() => setDraggableModuleId(mod.id)}
                 onMouseLeave={() => setDraggableModuleId(null)}
-                className="absolute -left-6 lg:-left-10 top-1/2 -translate-y-1/2 opacity-30 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-2 text-slate-600 hover:text-emerald-400 transition-opacity flex flex-col gap-[3px]"
+                // Centralizamos a alça verticalmente e damos o respiro no topo (pt-5)
+                className="flex items-start pt-5 w-6 shrink-0 opacity-30 group-hover:opacity-100 cursor-grab active:cursor-grabbing text-slate-400 hover:text-emerald-400 transition-opacity"
                 title="Segure para reordenar"
               >
-                {/* Desenhando os pontinhos do Grip */}
-                <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                {/* A MÁGICA DO GRID: 2 colunas, 3 linhas automáticas e gap de 3px */}
+                <div className="grid grid-cols-2 gap-[3px] pointer-events-none">
+                  {/* Linha 1 */}
+                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                  {/* Linha 2 */}
+                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                  {/* Linha 3 */}
+                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                </div>
               </div>
 
-              {/* Renderiza o Componente correto baseado no tipo */}
-              {mod.type === 'text' && <TextModule moduleData={mod as TextType} onUpdate={handleUpdateModule} />}
-              {mod.type === 'audio' && <AudioModule moduleData={mod as AudioType} onUpdate={handleUpdateModule} />}
-              {mod.type === 'pdf_crop' && <PdfModule moduleData={mod as PdfType} onUpdate={handleUpdateModule} />}
-              
-              {/* Botão flutuante de deletar módulo */}
-              <button 
-                onClick={() => handleDeleteModule(mod.id)}
-                className="absolute -top-3 -right-3 bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 group-hover:scale-100 flex items-center justify-center font-bold"
-                title="Remover Módulo"
-              >
-                ✕
-              </button>
+              {/* --- O MÓDULO E O BOTÃO DE EXCLUIR --- */}
+              {/* 3. flex-1 faz o módulo ocupar o resto da tela em segurança */}
+              <div className="flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md">
+                
+                {mod.type === 'text' && <TextModule moduleData={mod as TextType} onUpdate={handleUpdateModule} />}
+                {mod.type === 'audio' && <AudioModule moduleData={mod as AudioType} onUpdate={handleUpdateModule} />}
+                {mod.type === 'pdf_crop' && <PdfModule moduleData={mod as PdfType} onUpdate={handleUpdateModule} />}
+                
+                <button 
+                  onClick={() => handleDeleteModule(mod.id)}
+                  className="absolute -top-3 -right-3 bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 group-hover:scale-100 flex items-center justify-center font-bold z-10"
+                  title="Remover Módulo"
+                >
+                  ✕
+                </button>
+              </div>
+
             </div>
           ))
         )}

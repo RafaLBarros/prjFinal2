@@ -93,8 +93,6 @@ ipcMain.handle('fs:importAsset', async () => {
   }
 })
 
-// PODE APAGAR O 'fs:readPdf' (Base64). Não vamos mais usá-lo, o protocolo RPG fará esse trabalho.
-
 // --- FIM DA NOSSA API DE ARQUIVOS ---
 
 function createWindow(): void {
@@ -130,6 +128,84 @@ function createWindow(): void {
 // O APLICATIVO ACORDOU
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.electron')
+
+  // 1. Ouvinte para LISTAR todas as campanhas no Cofre
+  ipcMain.handle('fs:listCampaigns', async () => {
+    try {
+      const campaignsPath = join(app.getPath('userData'), 'campaigns');
+      // Garante que a pasta existe antes de tentar ler
+      await fs.mkdir(campaignsPath, { recursive: true }).catch(() => {});
+      
+      const files = await fs.readdir(campaignsPath);
+      // Devolve só os arquivos .json
+      return { success: true, files: files.filter(f => f.endsWith('.json')) };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 2. Ouvinte para SALVAR uma campanha direto no Cofre
+  ipcMain.handle('fs:saveCampaign', async (_, { fileName, content }) => {
+    try {
+      const campaignsPath = join(app.getPath('userData'), 'campaigns');
+      await fs.mkdir(campaignsPath, { recursive: true }).catch(() => {});
+      
+      // Garante que o nome termina com .json
+      const safeName = fileName.endsWith('.json') ? fileName : `${fileName}.json`;
+      const fullPath = join(campaignsPath, safeName);
+      
+      await fs.writeFile(fullPath, content, 'utf-8');
+      return { success: true, fileName: safeName };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 3. Ouvinte para CARREGAR uma campanha do Cofre
+  ipcMain.handle('fs:loadCampaign', async (_, fileName) => {
+    try {
+      const fullPath = join(app.getPath('userData'), 'campaigns', fileName);
+      const content = await fs.readFile(fullPath, 'utf-8');
+      return { success: true, content };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 4. Ouvinte para EXCLUIR uma campanha do Cofre
+  ipcMain.handle('fs:deleteCampaign', async (_, fileName) => {
+    try {
+      const fullPath = join(app.getPath('userData'), 'campaigns', fileName);
+      await fs.rm(fullPath); // Deleta o arquivo do disco
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  // 5. Ouvinte para RENOMEAR uma campanha no Cofre
+  ipcMain.handle('fs:renameCampaign', async (_, { oldName, newName }) => {
+    try {
+      const dir = join(app.getPath('userData'), 'campaigns');
+      const oldPath = join(dir, oldName);
+      
+      // Garante o .json no final do nome novo
+      const safeNewName = newName.endsWith('.json') ? newName : `${newName}.json`;
+      const newPath = join(dir, safeNewName);
+
+      // Verifica se o novo nome já existe (para não apagar outra campanha por acidente)
+      const files = await fs.readdir(dir);
+      if (files.includes(safeNewName) && safeNewName !== oldName) {
+         return { success: false, error: '⚠️ Já existe outra campanha com este nome.' };
+      }
+
+      // Executa a renomeação no Windows
+      await fs.rename(oldPath, newPath);
+      return { success: true, fileName: safeNewName };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

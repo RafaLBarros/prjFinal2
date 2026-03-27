@@ -69,7 +69,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   return (
     <div className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500">
       
-      {/* --- CABEÇALHO (Mantém igual) --- */}
+      {/* --- CABEÇALHO ATUALIZADO --- */}
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2 flex-1">
           <span className="text-red-400">📕</span>
@@ -81,6 +81,12 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
             placeholder="Nome do Livro (Ex: Bestiário)"
           />
         </div>
+        
+        {/* NOVO: BOTÃO DE MINIMIZAR AQUI */}
+        <button onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })} className="text-slate-500 hover:text-red-400 px-2 py-1 rounded transition text-sm font-bold">
+          {moduleData.isMinimized ? '▼' : '▲'}
+        </button>
+        
         <button 
           onClick={() => setIsEditing(!isEditing)}
           className="text-slate-400 hover:text-white text-sm bg-slate-700 px-2 py-1 rounded ml-2"
@@ -89,79 +95,84 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
         </button>
       </div>
 
-      {/* --- NOVA ÁREA DE CONFIGURAÇÃO (Com Botão de Upload) --- */}
-      {isEditing && (
-        <div className="bg-slate-900 p-4 border-b border-slate-700 flex flex-col items-start gap-2">
-          <label className="block text-xs text-slate-400 mb-1">
-            Arquivo atual: <span className="text-emerald-400 font-mono">{moduleData.data.filePath || 'Nenhum'}</span>
-          </label>
-          <div className="flex gap-2 w-full">
-            <button 
-              onClick={handleImportPdf}
-              className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition text-sm flex-1 flex items-center justify-center gap-2"
-            >
-              📥 Importar PDF do Computador
-            </button>
-            <input 
-              type="text"
-              value={moduleData.data.filePath}
-              onChange={(e) => onUpdate(moduleData.id, { data: { ...moduleData.data, filePath: e.target.value } })}
-              className="flex-1 bg-slate-800 text-slate-200 text-sm p-2 rounded border border-slate-600 focus:border-red-500 focus:outline-none placeholder:text-slate-600"
-              placeholder="Ou cole um link da Internet (http...)"
-            />
+      {/* --- TODO O RESTO DO MÓDULO FICA ESCONDIDO SE MINIMIZADO --- */}
+      {!moduleData.isMinimized && (
+        <>
+          {/* --- ÁREA DE CONFIGURAÇÃO --- */}
+          {isEditing && (
+            <div className="bg-slate-900 p-4 border-b border-slate-700 flex flex-col items-start gap-2">
+              <label className="block text-xs text-slate-400 mb-1">
+                Arquivo atual: <span className="text-emerald-400 font-mono">{moduleData.data.filePath || 'Nenhum'}</span>
+              </label>
+              <div className="flex gap-2 w-full">
+                <button 
+                  onClick={handleImportPdf}
+                  className="bg-emerald-600 hover:bg-emerald-500 text-white font-medium py-2 px-4 rounded transition text-sm flex-1 flex items-center justify-center gap-2"
+                >
+                  📥 Importar PDF do Computador
+                </button>
+                <input 
+                  type="text"
+                  value={moduleData.data.filePath}
+                  onChange={(e) => onUpdate(moduleData.id, { data: { ...moduleData.data, filePath: e.target.value } })}
+                  className="flex-1 bg-slate-800 text-slate-200 text-sm p-2 rounded border border-slate-600 focus:border-red-500 focus:outline-none placeholder:text-slate-600"
+                  placeholder="Ou cole um link da Internet (http...)"
+                />
+              </div>
+              <p className="text-xs text-slate-500 mt-1">
+                Arquivos importados são copiados com segurança para o cofre da campanha.
+              </p>
+            </div>
+          )}
+
+          {/* --- O VISUALIZADOR DE PDF --- */}
+          <div className="p-4 flex flex-col items-center bg-slate-950 overflow-hidden">
+            
+            {/* Barra de Paginação */}
+            {moduleData.data.filePath && (
+              <div className="flex items-center gap-4 mb-4 bg-slate-800 p-2 rounded-full border border-slate-700">
+                <button 
+                  onClick={goToPrevPage} disabled={moduleData.data.page <= 1}
+                  className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
+                >
+                  ◀
+                </button>
+                <span className="text-sm text-slate-300 font-mono w-24 text-center">
+                  Pág {moduleData.data.page} de {numPages || '?'}
+                </span>
+                <button 
+                  onClick={goToNextPage} disabled={!numPages || moduleData.data.page >= numPages}
+                  className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
+                >
+                  ▶
+                </button>
+              </div>
+            )}
+
+            {/* O Motor React-PDF desenhando na tela */}
+            {pdfSource ? (
+              <div className="border border-slate-800 shadow-2xl">
+                <Document 
+                  file={pdfSource}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  loading={<p className="text-slate-500 py-10">Lendo os arquivos secretos...</p>}
+                  error={<p className="text-red-500 py-10">Erro ao renderizar o PDF.</p>}
+                >
+                  <Page 
+                    pageNumber={moduleData.data.page} 
+                    renderTextLayer={false} 
+                    renderAnnotationLayer={false}
+                    width={600} 
+                  />
+                </Document>
+              </div>
+            ) : (
+              <p className="text-slate-600 italic py-10">Nenhum PDF importado.</p>
+            )}
+
           </div>
-          <p className="text-xs text-slate-500 mt-1">
-            Arquivos importados são copiados com segurança para o cofre da campanha.
-          </p>
-        </div>
+        </>
       )}
-
-      {/* --- O VISUALIZADOR DE PDF --- */}
-      <div className="p-4 flex flex-col items-center bg-slate-950 overflow-hidden">
-        
-        {/* Barra de Paginação */}
-        {moduleData.data.filePath && (
-          <div className="flex items-center gap-4 mb-4 bg-slate-800 p-2 rounded-full border border-slate-700">
-            <button 
-              onClick={goToPrevPage} disabled={moduleData.data.page <= 1}
-              className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
-            >
-              ◀
-            </button>
-            <span className="text-sm text-slate-300 font-mono w-24 text-center">
-              Pág {moduleData.data.page} de {numPages || '?'}
-            </span>
-            <button 
-              onClick={goToNextPage} disabled={!numPages || moduleData.data.page >= numPages}
-              className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
-            >
-              ▶
-            </button>
-          </div>
-        )}
-
-        {/* O Motor React-PDF desenhando na tela */}
-        {pdfSource ? (
-          <div className="border border-slate-800 shadow-2xl">
-            <Document 
-              file={pdfSource} // Passamos a fonte já processada (link ou rpg://)
-              onLoadSuccess={onDocumentLoadSuccess}
-              loading={<p className="text-slate-500 py-10">Lendo os arquivos secretos...</p>}
-              error={<p className="text-red-500 py-10">Erro ao renderizar o PDF.</p>}
-            >
-              <Page 
-                pageNumber={moduleData.data.page} 
-                renderTextLayer={false} 
-                renderAnnotationLayer={false}
-                width={600} // Limita a largura para não quebrar nosso layout
-              />
-            </Document>
-          </div>
-        ) : (
-          <p className="text-slate-600 italic py-10">Nenhum PDF importado.</p>
-        )}
-
-      </div>
     </div>
   );
 }

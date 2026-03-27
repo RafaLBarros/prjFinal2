@@ -7,7 +7,13 @@ const api = {
   chooseSavePath: () => ipcRenderer.invoke('dialog:saveFile'),
   readFile: (path: string) => ipcRenderer.invoke('fs:readFile', path),
   saveFile: (path: string, content: string) => ipcRenderer.invoke('fs:saveFile', { path, content }),
-  importAsset: () => ipcRenderer.invoke('fs:importAsset')
+  importAsset: () => ipcRenderer.invoke('fs:importAsset'),
+  // NOVAS FUNÇÕES DO COFRE DE CAMPANHAS:
+  listCampaigns: () => ipcRenderer.invoke('fs:listCampaigns'),
+  saveCampaign: (fileName: string, content: string) => ipcRenderer.invoke('fs:saveCampaign', { fileName, content }),
+  loadCampaign: (fileName: string) => ipcRenderer.invoke('fs:loadCampaign', fileName),
+  deleteCampaign: (fileName: string) => ipcRenderer.invoke('fs:deleteCampaign', fileName),
+  renameCampaign: (oldName: string, newName: string) => ipcRenderer.invoke('fs:renameCampaign', { oldName, newName })
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

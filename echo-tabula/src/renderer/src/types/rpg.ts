@@ -6,6 +6,7 @@ export interface BaseModule {
   id: string;          // Um código único (ex: "mod-123") para o React não se perder
   name: string;        // O nome que o usuário dá (ex: "Música de Tensão", "Ficha do Boss")
   isActive: boolean;   // O botão principal: se false, a música não toca, o texto não aparece.
+  isMinimized?: boolean; // <-- ADICIONE ESTA LINHA (A interrogação significa que é opcional, para não quebrar campanhas antigas)
 }
 
 // ---------------------------------------------------------

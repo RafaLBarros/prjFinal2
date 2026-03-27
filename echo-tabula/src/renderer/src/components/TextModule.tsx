@@ -132,25 +132,41 @@ export function TextModule({ moduleData, onUpdate }: Props) {
         }
       `}</style>
 
-      <div className="flex items-center gap-2 p-3 border-b border-slate-700/50 bg-slate-800/50">
-        <span className="text-emerald-400">📝</span>
-        <input 
-          type="text"
-          value={moduleData.name}
-          onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })}
-          className="bg-transparent text-emerald-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-emerald-700"
-          placeholder="Título da Nota..."
-        />
+      {/* --- CABEÇALHO ATUALIZADO COM BOTÃO DE MINIMIZAR --- */}
+      <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
+        <div className="flex items-center gap-2 flex-1">
+          <span className="text-emerald-400">📝</span>
+          <input 
+            type="text"
+            value={moduleData.name}
+            onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })}
+            className="bg-transparent text-emerald-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-emerald-700"
+            placeholder="Título da Nota..."
+          />
+        </div>
+        
+        {/* BOTÃO DE MINIMIZAR / MAXIMIZAR */}
+        <button
+          onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })}
+          className="text-slate-500 hover:text-emerald-400 px-2 py-1 rounded transition text-sm font-bold"
+          title={moduleData.isMinimized ? "Expandir" : "Minimizar"}
+        >
+          {moduleData.isMinimized ? '▼' : '▲'}
+        </button>
       </div>
 
-      <MenuBar editor={editor} />
-
-      <div className="p-5">
-        <EditorContent 
-          editor={editor} 
-          className="prose prose-invert prose-emerald max-w-none prose-h1:text-2xl prose-h2:text-xl prose-p:text-slate-300" 
-        />
-      </div>
+      {/* --- CORPO DO MÓDULO (SÓ RENDERIZA SE NÃO ESTIVER MINIMIZADO) --- */}
+      {!moduleData.isMinimized && (
+        <>
+          <MenuBar editor={editor} />
+          <div className="p-5">
+            <EditorContent 
+              editor={editor} 
+              className="prose prose-invert prose-emerald max-w-none prose-h1:text-2xl prose-h2:text-xl prose-p:text-slate-300" 
+            />
+          </div>
+        </>
+      )}
 
     </div>
   );
