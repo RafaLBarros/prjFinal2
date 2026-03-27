@@ -9,65 +9,87 @@ interface SidebarProps {
   onToggleFolder: (id: string) => void;
   onAddNode: (parentId: string | null, type: 'folder' | 'scene') => void;
   onDeleteNode: (id: string) => void;
-  onMoveNode: (draggedId: string, targetFolderId: string | null) => void;
-  onRenameNode: (id: string, newName: string) => void; // <--- NOVA FUNÇÃO
+  // ATUALIZAMOS A FUNÇÃO DE MOVER AQUI:
+  onMoveNode: (draggedId: string, targetId: string | null, position: 'before' | 'after' | 'inside') => void;
+  onRenameNode: (id: string, newName: string) => void;
   level?: number; 
 }
 
-// --- SUBCOMPONENTE: UM ITEM ÚNICO DA ÁRVORE ---
-// Criamos isso para que cada item tenha seu próprio estado "isEditing" isolado.
 function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps }) {
   const { activeSceneId, onSelectScene, onToggleFolder, onAddNode, onDeleteNode, onMoveNode, onRenameNode, level = 0 } = props;
   
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(node.name);
+  
+  // NOVO: Estado para saber ONDE o drag está acontecendo
+  const [dragPosition, setDragPosition] = useState<'before' | 'after' | 'inside' | null>(null);
 
-  // Função que salva o novo nome
   const handleSaveRename = () => {
     setIsEditing(false);
     if (editName.trim() !== '' && editName !== node.name) {
       onRenameNode(node.id, editName.trim());
     } else {
-      setEditName(node.name); // Reverte se o usuário deixar em branco
-    }
-  };
-
-  // Permite salvar com "Enter" ou cancelar com "Esc"
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') handleSaveRename();
-    if (e.key === 'Escape') {
-      setIsEditing(false);
       setEditName(node.name);
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') handleSaveRename();
+    if (e.key === 'Escape') { setIsEditing(false); setEditName(node.name); }
+  };
+
+  // Lógica visual do Drop (Sombras Azuis sem quebrar o layout)
+  const dragClass = dragPosition === 'before' ? 'shadow-[0_-2px_0_0_#3b82f6] z-10' :
+                    dragPosition === 'after'  ? 'shadow-[0_2px_0_0_#3b82f6] z-10' :
+                    dragPosition === 'inside' ? 'bg-blue-600/30 ring-1 ring-blue-500 z-10' : '';
+
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col relative">
       <div 
-        draggable={!isEditing} // Bloqueia o arrasto enquanto digita
+        draggable={!isEditing}
         onDragStart={(e) => {
           if (isEditing) { e.preventDefault(); return; }
           e.stopPropagation();
           e.dataTransfer.setData('nodeId', node.id);
         }}
-        onDragOver={(e) => { e.preventDefault(); e.stopPropagation(); }}
+        // A MÁGICA DA MATEMÁTICA ACONTECE AQUI:
+        onDragOver={(e) => {
+          e.preventDefault(); 
+          e.stopPropagation();
+          if (isEditing) return;
+
+          const rect = e.currentTarget.getBoundingClientRect();
+          const y = e.clientY - rect.top; // Posição Y do mouse dentro do elemento
+
+          if (y < rect.height * 0.25) {
+            setDragPosition('before'); // Mouse no topo (25%)
+          } else if (y > rect.height * 0.75) {
+            setDragPosition('after');  // Mouse no fundo (25%)
+          } else if (node.type === 'folder') {
+            setDragPosition('inside'); // Mouse no meio de uma pasta
+          } else {
+            setDragPosition('after');  // Mouse no meio de uma cena (cenas não recebem itens dentro)
+          }
+        }}
+        onDragLeave={() => setDragPosition(null)}
         onDrop={(e) => {
           e.preventDefault();
           e.stopPropagation();
+          setDragPosition(null);
+          
           const draggedId = e.dataTransfer.getData('nodeId');
-          if (node.type === 'folder' && draggedId !== node.id) {
-            onMoveNode(draggedId, node.id);
+          if (draggedId !== node.id && dragPosition) {
+            onMoveNode(draggedId, node.id, dragPosition);
           }
         }}
         style={{ paddingLeft: `${level * 16 + 8}px` }}
-        className={`flex items-center justify-between py-1.5 pr-2 rounded group transition-colors ${
-          !isEditing ? 'cursor-grab active:cursor-grabbing' : ''
-        } ${
-          activeSceneId === node.id 
+        className={`flex items-center justify-between py-1.5 pr-2 rounded transition-all ${
+          !isEditing ? 'cursor-grab active:cursor-grabbing group' : ''
+        } ${dragClass} ${
+          activeSceneId === node.id && !dragPosition 
             ? 'bg-emerald-600/20 text-emerald-400' 
-            : 'text-slate-300 hover:bg-slate-800 focus-within:bg-slate-800'
+            : dragPosition ? '' : 'text-slate-300 hover:bg-slate-800 focus-within:bg-slate-800'
         }`}
-        // Clique simples (Abre/Seleciona) ou Clique Duplo (Edita)
         onClick={() => {
           if (isEditing) return;
           node.type === 'scene' ? onSelectScene(node.id) : onToggleFolder(node.id);
@@ -79,52 +101,41 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
             {node.type === 'folder' ? (node.isOpen ? '📂' : '📁') : '📜'}
           </span>
           
-          {/* MODO EDIÇÃO vs MODO LEITURA */}
           {isEditing ? (
             <input 
-              autoFocus
-              value={editName}
-              onChange={(e) => setEditName(e.target.value)}
-              onBlur={handleSaveRename} // Salva ao clicar fora
-              onKeyDown={handleKeyDown}
+              autoFocus value={editName} onChange={(e) => setEditName(e.target.value)}
+              onBlur={handleSaveRename} onKeyDown={handleKeyDown}
               className="bg-slate-950 text-emerald-400 text-sm px-1 py-0 w-full outline-none border border-emerald-500 rounded"
-              onClick={(e) => e.stopPropagation()} // Evita que o clique no input selecione a cena
+              onClick={(e) => e.stopPropagation()}
             />
           ) : (
             <span className="text-sm truncate select-none pointer-events-none">{node.name}</span>
           )}
         </div>
 
-        {/* Ações (Esconde se estiver digitando) */}
         {!isEditing && (
           <div className="hidden group-hover:flex items-center gap-1 shrink-0">
             {node.type === 'folder' && (
               <>
-                <button onClick={(e) => { e.stopPropagation(); onAddNode(node.id, 'folder'); }} className="text-xs text-slate-500 hover:text-emerald-400 p-1" title="Nova Subpasta">+📂</button>
-                <button onClick={(e) => { e.stopPropagation(); onAddNode(node.id, 'scene'); }} className="text-xs text-slate-500 hover:text-emerald-400 p-1" title="Nova Cena">+📜</button>
+                <button onClick={(e) => { e.stopPropagation(); onAddNode(node.id, 'folder'); }} className="text-xs text-slate-500 hover:text-emerald-400 p-1">+📂</button>
+                <button onClick={(e) => { e.stopPropagation(); onAddNode(node.id, 'scene'); }} className="text-xs text-slate-500 hover:text-emerald-400 p-1">+📜</button>
               </>
             )}
-            <button onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id); }} className="text-xs text-slate-500 hover:text-red-400 p-1 ml-1" title="Excluir">🗑️</button>
+            <button onClick={(e) => { e.stopPropagation(); onDeleteNode(node.id); }} className="text-xs text-slate-500 hover:text-red-400 p-1 ml-1">🗑️</button>
           </div>
         )}
       </div>
 
-      {/* A MÁGICA RECURSIVA (Subpastas) */}
       {node.type === 'folder' && node.isOpen && node.children && (
-        <Sidebar 
-          {...props} // Repassa todas as funções de controle (incluindo o rename)
-          nodes={node.children} 
-          level={level + 1} 
-        />
+        <Sidebar {...props} nodes={node.children} level={level + 1} />
       )}
     </div>
   );
 }
 
-// --- COMPONENTE PRINCIPAL (O Orquestrador da Lista) ---
 export function Sidebar(props: SidebarProps) {
   return (
-    <div className="w-full flex flex-col gap-1">
+    <div className="w-full flex flex-col gap-[2px]">
       {props.nodes.map((node) => (
         <SidebarNode key={node.id} node={node} props={props} />
       ))}

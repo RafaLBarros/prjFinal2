@@ -80,20 +80,15 @@ export default function App() {
     if (activeSceneId === targetId) setActiveSceneId(null); // Limpa o palco se excluiu a cena atual
   };
 
-  // --- NOVA FUNÇÃO: MOVER NÓ (DRAG & DROP) ---
-  const handleMoveNode = (draggedId: string, targetFolderId: string | null) => {
+  // --- FUNÇÃO ATUALIZADA: MOVER NÓ COM REORDENAÇÃO ---
+  const handleMoveNode = (draggedId: string, targetId: string | null, position: 'before' | 'after' | 'inside' = 'inside') => {
     let draggedNode: CampaignNode | null = null;
 
-    // Etapa 1: Arranca o nó do lugar antigo e guarda na variável
+    // Etapa 1: Arranca o nó de onde ele estava
     const removeNode = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.filter(node => {
-        if (node.id === draggedId) {
-          draggedNode = node;
-          return false; // Remove da lista
-        }
-        if (node.children) {
-          node.children = removeNode(node.children);
-        }
+        if (node.id === draggedId) { draggedNode = node; return false; }
+        if (node.children) node.children = removeNode(node.children);
         return true;
       });
     };
@@ -102,20 +97,37 @@ export default function App() {
     if (!draggedNode) return;
 
     // Etapa 2: Costura o nó no lugar novo
-    if (targetFolderId === null) {
-      newTree.push(draggedNode); // Soltou no vazio = Vai para a raiz
+    if (targetId === null) {
+      newTree.push(draggedNode); // Fundo vazio = Raiz
     } else {
       const insertNode = (nodes: CampaignNode[]): CampaignNode[] => {
-        return nodes.map(node => {
-          if (node.id === targetFolderId && node.type === 'folder') {
-            // Se achou a pasta destino, coloca o item dentro dela e garante que ela está aberta
-            return { ...node, isOpen: true, children: [...(node.children || []), draggedNode!] };
+        const result: CampaignNode[] = [];
+        
+        for (const node of nodes) {
+          if (node.id === targetId) {
+            // Se for pra colocar ANTES, empurra na lista primeiro
+            if (position === 'before') result.push(draggedNode!);
+            
+            // Se for DENTRO, coloca nos filhos
+            if (position === 'inside' && node.type === 'folder') {
+              result.push({ ...node, isOpen: true, children: [...(node.children || []), draggedNode!] });
+            } else {
+              result.push(node); // Mantém o nó atual na lista
+            }
+
+            // Se for DEPOIS, empurra na lista depois
+            if (position === 'after') result.push(draggedNode!);
+            
+          } else {
+            // Se não é o alvo, só continua vasculhando
+            if (node.children) {
+              result.push({ ...node, children: insertNode(node.children) });
+            } else {
+              result.push(node);
+            }
           }
-          if (node.children) {
-            return { ...node, children: insertNode(node.children) };
-          }
-          return node;
-        });
+        }
+        return result;
       };
       newTree = insertNode(newTree);
     }
@@ -160,7 +172,7 @@ export default function App() {
           onDrop={(e) => {
             e.preventDefault();
             const draggedId = e.dataTransfer.getData('nodeId');
-            if(draggedId) handleMoveNode(draggedId, null); // Envia para a raiz
+            if(draggedId) handleMoveNode(draggedId, null, 'inside'); // <-- Atualizado aqui
           }}
         >
           <Sidebar 
