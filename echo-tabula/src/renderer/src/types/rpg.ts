@@ -67,6 +67,8 @@ export interface CampaignNode {
   id: string;
   type: NodeType;
   name: string;
-  isOpen?: boolean; // Apenas para pastas (saber se está expandida ou recolhida)
-  children?: CampaignNode[]; // O conteúdo de dentro da pasta
+  isOpen?: boolean;
+  children?: CampaignNode[];
+  // NOVA PROPRIEDADE (Opcional, pois Pastas não têm módulos, só Cenas)
+  modules?: RpgModule[]; 
 }

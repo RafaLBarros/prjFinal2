@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CampaignNode } from './types/rpg';
+import { SceneManager } from './components/SceneManager';
 
 export default function App() {
   // O Estado da nossa Árvore de Pastas (Exemplo Inicial)
@@ -151,6 +152,36 @@ export default function App() {
     setTree(renameInTree(tree));
   };
 
+  // Procura na árvore a cena que está selecionada no momento
+  const getActiveScene = (nodes: CampaignNode[]): CampaignNode | null => {
+    for (const node of nodes) {
+      if (node.id === activeSceneId && node.type === 'scene') return node;
+      if (node.children) {
+        const found = getActiveScene(node.children);
+        if (found) return found;
+      }
+    }
+    return null;
+  };
+
+  const activeScene = activeSceneId ? getActiveScene(tree) : null;
+
+  // Quando o SceneManager altera um módulo, salvamos de volta na árvore
+  const handleUpdateSceneModules = (sceneId: string, newModules: any[]) => {
+    const updateModulesInTree = (nodes: CampaignNode[]): CampaignNode[] => {
+      return nodes.map(node => {
+        if (node.id === sceneId && node.type === 'scene') {
+          return { ...node, modules: newModules };
+        }
+        if (node.children) {
+          return { ...node, children: updateModulesInTree(node.children) };
+        }
+        return node;
+      });
+    };
+    setTree(updateModulesInTree(tree));
+  };
+
   return (
     // Layout Principal: Flexbox que ocupa a tela toda (h-screen)
     <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans">
@@ -189,17 +220,17 @@ export default function App() {
       </div>
 
       {/* --- PALCO PRINCIPAL (Direita) --- */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-opacity-5">
-        <div className="flex-1 flex items-center justify-center">
-          {activeSceneId ? (
-            <div className="text-center">
-              <h2 className="text-2xl font-bold text-slate-500 mb-2">Cena Selecionada: {activeSceneId}</h2>
-              <p className="text-slate-600">O Gerenciador de Módulos entrará aqui no próximo passo!</p>
-            </div>
-          ) : (
+      <div className="flex-1 flex flex-col overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-opacity-5 relative">
+        {activeScene ? (
+          <SceneManager 
+            scene={activeScene} 
+            onUpdateModules={handleUpdateSceneModules} 
+          />
+        ) : (
+          <div className="flex-1 flex items-center justify-center">
             <p className="text-slate-600 italic">Selecione uma cena no menu lateral para começar.</p>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
     </div>
