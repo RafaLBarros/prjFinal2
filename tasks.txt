@@ -151,3 +151,16 @@ Objetivo: Transformar o protótipo em produto apresentável.
 [ ] Build Final: Rodar o comando para gerar o .exe e testar em outro computador.
 
 [ ] Escrita do TCC: Tirar prints do código e das telas para o documento final.
+
+
+
+
+
+
+
+FASE DE PRODUÇÃO
+
+DRAG AND DROP DOS MODULOS AINDA ESTÁ FALHO
+MODIFICAR TITULO DO MODULO DE AUDIO PARA FICAR IGUAL O DE PDF E DE TEXTO
+FAZER UMA PASTA PADRÃO PARA SALVAR E IMPORTAR OS ARQUIVOS MAIS FACILMENTE
+ADICIONAR MINIMIZAÇÃO DE MÓDULOS
