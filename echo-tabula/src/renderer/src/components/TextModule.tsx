@@ -1,20 +1,40 @@
 // src/renderer/src/components/TextModule.tsx
+import { useState, useEffect } from 'react'; // <-- Adicionamos isso aqui!
 import { TextModule as TextModuleType, RpgModule } from '../types/rpg';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
+import Placeholder from '@tiptap/extension-placeholder';
 
 // --- SUBCOMPONENTE: A BARRA DE FERRAMENTAS ---
 const MenuBar = ({ editor }: { editor: Editor | null }) => {
+  // 1. Criamos um "gatilho" invisível para forçar o React a atualizar a tela
+  const [, forceUpdate] = useState({});
+
+  // 2. Ensinamos a Barra a escutar todas as "Transações" (movimentos e atalhos)
+  useEffect(() => {
+    if (!editor) return;
+
+    const handleTransaction = () => forceUpdate({});
+
+    // Toda vez que o cursor se mover ou um atalho for apertado, a barra se atualiza!
+    editor.on('transaction', handleTransaction);
+
+    return () => {
+      editor.off('transaction', handleTransaction);
+    };
+  }, [editor]);
+
   if (!editor) return null;
 
-  // Uma função auxiliar para desenhar os botões bonitinhos
   const MenuButton = ({ onClick, isActive, title, icon }: any) => (
     <button
+      type="button" // Garante que o navegador entenda que é só um botão simples
+      onMouseDown={(e) => e.preventDefault()} // <-- A MÁGICA AQUI: Impede o botão de roubar o foco do texto!
       onClick={onClick}
-      title={title} // ISSO AQUI CRIA O TOOLTIP!
+      title={title}
       className={`px-2 py-1 rounded text-sm font-medium transition ${
         isActive 
-          ? 'bg-emerald-600 text-white' 
+          ? 'bg-emerald-600 text-white shadow-inner shadow-black/20' 
           : 'text-slate-400 hover:bg-slate-700 hover:text-white'
       }`}
     >
@@ -40,7 +60,7 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
         title="Tachado (Ctrl+Shift+X)" icon="S" 
       />
       
-      <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> {/* Divisor */}
+      <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> 
 
       <MenuButton 
         onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()} 
@@ -53,7 +73,7 @@ const MenuBar = ({ editor }: { editor: Editor | null }) => {
         title="Subtítulo (##)" icon="H2" 
       />
       
-      <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> {/* Divisor */}
+      <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> 
 
       <MenuButton 
         onClick={() => editor.chain().focus().toggleBulletList().run()} 
@@ -77,7 +97,13 @@ interface Props {
 
 export function TextModule({ moduleData, onUpdate }: Props) {
   const editor = useEditor({
-    extensions: [StarterKit],
+    extensions: [
+      StarterKit,
+      Placeholder.configure({
+        placeholder: 'Comece a digitar os segredos da campanha...',
+        emptyEditorClass: 'is-editor-empty',
+      }),
+    ],
     content: moduleData.data.content,
     onUpdate: ({ editor }) => {
       onUpdate(moduleData.id, { 
@@ -96,6 +122,16 @@ export function TextModule({ moduleData, onUpdate }: Props) {
   return (
     <div className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
       
+      <style>{`
+        .tiptap p.is-editor-empty:first-child::before {
+          content: attr(data-placeholder);
+          float: left;
+          color: #475569;
+          pointer-events: none;
+          height: 0;
+        }
+      `}</style>
+
       <div className="flex items-center gap-2 p-3 border-b border-slate-700/50 bg-slate-800/50">
         <span className="text-emerald-400">📝</span>
         <input 
@@ -107,7 +143,6 @@ export function TextModule({ moduleData, onUpdate }: Props) {
         />
       </div>
 
-      {/* A BARRA DE FERRAMENTAS ENTRA AQUI! */}
       <MenuBar editor={editor} />
 
       <div className="p-5">

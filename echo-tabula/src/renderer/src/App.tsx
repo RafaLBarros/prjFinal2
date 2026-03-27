@@ -290,7 +290,8 @@ export default function App() {
         {activeScene ? (
           <SceneManager 
             scene={activeScene} 
-            onUpdateModules={handleUpdateSceneModules} 
+            onUpdateModules={handleUpdateSceneModules}
+            onRenameScene={handleRenameNode}
           />
         ) : (
           <div className="flex-1 flex items-center justify-center">
