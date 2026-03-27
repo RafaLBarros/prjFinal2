@@ -59,3 +59,14 @@ export interface Scene {
   // Aqui está a mágica: um array que aceita qualquer módulo misturado!
   modules: RpgModule[]; 
 }
+
+export type NodeType = 'folder' | 'scene';
+
+// Essa é a interface mágica da Árvore. Uma pasta pode conter outras pastas ou cenas dentro de 'children'.
+export interface CampaignNode {
+  id: string;
+  type: NodeType;
+  name: string;
+  isOpen?: boolean; // Apenas para pastas (saber se está expandida ou recolhida)
+  children?: CampaignNode[]; // O conteúdo de dentro da pasta
+}
