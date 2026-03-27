@@ -152,6 +152,49 @@ export default function App() {
     setTree(renameInTree(tree));
   };
 
+  // --- FUNÇÕES DE ARQUIVO (SALVAR E CARREGAR) ---
+
+  const handleSaveCampaign = async () => {
+    // 1. Pergunta ao usuário onde ele quer salvar (Abre a janela do Windows)
+    const dialogResult = await window.api.chooseSavePath();
+    if (!dialogResult.success || !dialogResult.path) return; // Usuário cancelou
+
+    // 2. Transforma a nossa Árvore (Objeto JS) em um Texto JSON bonitinho
+    const dataToSave = JSON.stringify(tree, null, 2);
+
+    // 3. Pede pro Node.js gravar esse texto no disco
+    const saveResult = await window.api.saveFile(dialogResult.path, dataToSave);
+    
+    if (saveResult.success) {
+      // Dica: No futuro podemos trocar esse alert por uma notificação mais elegante na tela
+      alert('Campanha salva com sucesso!'); 
+    } else {
+      alert(`Erro ao salvar: ${saveResult.error}`);
+    }
+  };
+
+  const handleLoadCampaign = async () => {
+    // 1. Pede pro usuário escolher o arquivo JSON
+    const dialogResult = await window.api.selectFile();
+    if (!dialogResult.success || !dialogResult.path) return;
+
+    // 2. Pede pro Node.js ler o conteúdo do arquivo
+    const readResult = await window.api.readFile(dialogResult.path);
+    
+    if (readResult.success && readResult.content) {
+      try {
+        // 3. Tenta converter o Texto JSON de volta para a nossa Árvore (Objeto JS)
+        const loadedTree = JSON.parse(readResult.content);
+        setTree(loadedTree);
+        setActiveSceneId(null); // Limpa o palco para evitar renderizar cenas apagadas
+      } catch (error) {
+        alert('Erro: O arquivo selecionado não é uma campanha válida do Echo Tabula.');
+      }
+    } else {
+      alert(`Erro ao carregar: ${readResult.error}`);
+    }
+  };
+
   // Procura na árvore a cena que está selecionada no momento
   const getActiveScene = (nodes: CampaignNode[]): CampaignNode | null => {
     for (const node of nodes) {
@@ -188,11 +231,34 @@ export default function App() {
       
       {/* --- BARRA LATERAL (Esquerda) --- */}
       <div className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
-        <div className="p-4 border-b border-slate-800 flex justify-between items-center">
-          <h1 className="font-bold text-emerald-500 tracking-wider text-sm uppercase">Echo Tabula</h1>
-          <div className="flex gap-1">
-            <button onClick={() => handleAddNode(null, 'folder')} className="text-slate-400 hover:text-emerald-400 p-1" title="Nova Pasta Raiz">+📂</button>
-            <button onClick={() => handleAddNode(null, 'scene')} className="text-slate-400 hover:text-emerald-400 p-1" title="Nova Cena Raiz">+📜</button>
+        <div className="p-4 border-b border-slate-800 flex flex-col gap-4">
+          {/* Título e Botões de Salvar/Abrir */}
+          <div className="flex justify-between items-center">
+            <h1 className="font-bold text-emerald-500 tracking-wider text-sm uppercase">Echo Tabula</h1>
+            <div className="flex gap-2">
+              <button onClick={handleLoadCampaign} className="text-slate-400 hover:text-blue-400 transition-colors" title="Abrir Campanha (Load)">
+                📂
+              </button>
+              <button onClick={handleSaveCampaign} className="text-slate-400 hover:text-emerald-400 transition-colors" title="Salvar Campanha (Save)">
+                💾
+              </button>
+            </div>
+          </div>
+          
+          {/* Botões grandes de criar Nova Pasta e Cena */}
+          <div className="flex gap-2">
+            <button 
+              onClick={() => handleAddNode(null, 'folder')} 
+              className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-1.5 rounded transition border border-slate-700 font-medium"
+            >
+              + Pasta
+            </button>
+            <button 
+              onClick={() => handleAddNode(null, 'scene')} 
+              className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-1.5 rounded transition border border-slate-700 font-medium"
+            >
+              + Cena
+            </button>
           </div>
         </div>
         
