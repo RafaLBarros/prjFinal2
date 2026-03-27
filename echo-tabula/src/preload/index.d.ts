@@ -8,7 +8,7 @@ declare global {
       chooseSavePath: () => Promise<{ success: boolean; path?: string }>
       readFile: (path: string) => Promise<{ success: boolean; content?: string; error?: string }>
       saveFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>
-      readPdf: (path: string) => Promise<{ success: boolean; data?: string; error?: string }>
+      importAsset: () => Promise<{ success: boolean; fileName?: string; error?: string }>
     }
   }
 }

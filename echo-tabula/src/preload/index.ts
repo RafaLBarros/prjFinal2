@@ -7,7 +7,7 @@ const api = {
   chooseSavePath: () => ipcRenderer.invoke('dialog:saveFile'),
   readFile: (path: string) => ipcRenderer.invoke('fs:readFile', path),
   saveFile: (path: string, content: string) => ipcRenderer.invoke('fs:saveFile', { path, content }),
-  readPdf: (path: string) => ipcRenderer.invoke('fs:readPdf', path)
+  importAsset: () => ipcRenderer.invoke('fs:importAsset')
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to
