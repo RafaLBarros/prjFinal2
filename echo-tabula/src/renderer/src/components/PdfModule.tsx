@@ -22,6 +22,42 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   // NOVO: Estado temporário para o campo de digitação
   const [inputPage, setInputPage] = useState(moduleData.data.page.toString());
 
+  // NOVOS ESTADOS: Controle de Marca-páginas
+  const [isAddingBookmark, setIsAddingBookmark] = useState(false);
+  const [newBookmarkName, setNewBookmarkName] = useState('');
+
+  // Puxa os marca-páginas salvos (ou inicia um array vazio se for um PDF novo)
+  const bookmarks: { id: string, name: string, page: number }[] = moduleData.data.bookmarks || [];
+
+  // FUNÇÕES DO MARCA-PÁGINA
+  const handleAddBookmark = () => {
+    if (!newBookmarkName.trim()) return;
+    
+    const newBookmark = {
+      id: crypto.randomUUID(),
+      name: newBookmarkName.trim(),
+      page: moduleData.data.page // Salva a página que o cara tá olhando AGORA
+    };
+
+    onUpdate(moduleData.id, {
+      data: { ...moduleData.data, bookmarks: [...bookmarks, newBookmark] }
+    });
+
+    setNewBookmarkName('');
+    setIsAddingBookmark(false);
+  };
+
+  const handleRemoveBookmark = (idToRemove: string) => {
+    onUpdate(moduleData.id, {
+      data: { ...moduleData.data, bookmarks: bookmarks.filter(b => b.id !== idToRemove) }
+    });
+  };
+
+  const jumpToBookmark = (pageNumber: number) => {
+    setInputPage(pageNumber.toString()); // Atualiza o input visual
+    onUpdate(moduleData.id, { data: { ...moduleData.data, page: pageNumber } });
+  };
+
   // NOVO: Mantém o campo de texto sincronizado caso você use as setinhas
   useEffect(() => {
     setInputPage(moduleData.data.page.toString());
@@ -157,38 +193,87 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
           {/* --- O VISUALIZADOR DE PDF --- */}
           <div className="p-4 flex flex-col items-center bg-slate-950 overflow-hidden">
             
-            {/* --- BARRA DE PAGINAÇÃO INTERATIVA --- */}
+            {/* --- ÁREA DE NAVEGAÇÃO E MARCA-PÁGINAS --- */}
             {moduleData.data.filePath && (
-              <div className="flex items-center gap-3 mb-4 bg-slate-800 p-2 rounded-full border border-slate-700">
+              <div className="flex flex-col items-center w-full max-w-2xl mb-4 gap-3">
                 
-                <button 
-                  onClick={goToPrevPage} disabled={moduleData.data.page <= 1}
-                  className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
-                >
-                  ◀
-                </button>
-                
-                {/* O NOVO INPUT DE PÁGINA */}
-                <div className="flex items-center gap-2 text-sm text-slate-300 font-mono">
-                  <span>Pág</span>
-                  <input
-                    type="text"
-                    value={inputPage}
-                    onChange={(e) => setInputPage(e.target.value)}
-                    onBlur={handlePageSubmit} // Muda a página ao clicar fora
-                    onKeyDown={(e) => e.key === 'Enter' && handlePageSubmit()} // Muda a página ao dar Enter
-                    className="w-12 bg-slate-900 border border-slate-600 rounded text-center focus:outline-none focus:border-red-500 text-emerald-400 font-bold transition-colors"
-                    title="Digite a página e aperte Enter"
-                  />
-                  <span>de {numPages || '?'}</span>
+                {/* 1. BARRA DE PAGINAÇÃO (Atualizada com botão de Salvar) */}
+                <div className="flex items-center gap-3 bg-slate-800 p-2 rounded-full border border-slate-700 shadow-md">
+                  <button 
+                    onClick={goToPrevPage} disabled={moduleData.data.page <= 1}
+                    className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
+                  >◀</button>
+                  
+                  <div className="flex items-center gap-2 text-sm text-slate-300 font-mono">
+                    <span>Pág</span>
+                    <input
+                      type="text"
+                      value={inputPage}
+                      onChange={(e) => setInputPage(e.target.value)}
+                      onBlur={handlePageSubmit}
+                      onKeyDown={(e) => e.key === 'Enter' && handlePageSubmit()}
+                      className="w-12 bg-slate-900 border border-slate-600 rounded text-center focus:outline-none focus:border-red-500 text-emerald-400 font-bold transition-colors"
+                    />
+                    <span>de {numPages || '?'}</span>
+                  </div>
+
+                  <button 
+                    onClick={goToNextPage} disabled={!numPages || moduleData.data.page >= numPages}
+                    className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
+                  >▶</button>
+
+                  {/* O BOTÃO MÁGICO DE SALVAR A PÁGINA */}
+                  <div className="w-px h-6 bg-slate-600 mx-1"></div> {/* Linha divisória */}
+                  <button 
+                    onClick={() => setIsAddingBookmark(!isAddingBookmark)}
+                    className={`px-3 py-1 rounded-full text-sm font-medium transition flex items-center gap-1 ${isAddingBookmark ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-amber-500 hover:text-white'}`}
+                    title="Salvar esta página como atalho"
+                  >
+                    🔖 {isAddingBookmark ? 'Cancelar' : 'Salvar'}
+                  </button>
                 </div>
 
-                <button 
-                  onClick={goToNextPage} disabled={!numPages || moduleData.data.page >= numPages}
-                  className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
-                >
-                  ▶
-                </button>
+                {/* 2. CAIXINHA PARA DIGITAR O NOME DO MARCA-PÁGINA */}
+                {isAddingBookmark && (
+                  <div className="flex gap-2 bg-slate-800 p-2 rounded-lg border border-amber-600/50 shadow-lg animate-in fade-in slide-in-from-top-2">
+                    <input 
+                      autoFocus
+                      type="text" 
+                      value={newBookmarkName}
+                      onChange={(e) => setNewBookmarkName(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddBookmark()}
+                      placeholder="Ex: Ficha do Dragão"
+                      className="bg-slate-900 text-sm text-slate-200 px-3 py-1.5 rounded focus:outline-none focus:border-amber-500 border border-slate-600"
+                    />
+                    <button onClick={handleAddBookmark} className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-sm font-bold transition">
+                      OK
+                    </button>
+                  </div>
+                )}
+
+                {/* 3. A PRATELEIRA DE ATALHOS SALVOS */}
+                {bookmarks.length > 0 && (
+                  <div className="flex flex-wrap justify-center gap-2 w-full px-4">
+                    {bookmarks.map(bm => (
+                      <div key={bm.id} className="flex items-center bg-slate-800 border border-slate-600 rounded-md overflow-hidden shadow-sm group hover:border-amber-500 transition-colors">
+                        <button 
+                          onClick={() => jumpToBookmark(bm.page)}
+                          className="px-3 py-1.5 text-xs text-slate-300 hover:text-amber-400 hover:bg-slate-700 flex items-center gap-2 transition"
+                        >
+                          <span className="text-amber-500">🔖</span>
+                          {bm.name} <span className="opacity-50 font-mono text-[10px] ml-1">(p.{bm.page})</span>
+                        </button>
+                        <button 
+                          onClick={() => handleRemoveBookmark(bm.id)}
+                          className="px-2 py-1.5 bg-slate-800 hover:bg-red-900/80 text-slate-500 hover:text-red-400 transition"
+                          title="Remover atalho"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
 
               </div>
             )}

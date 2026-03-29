@@ -31,13 +31,13 @@ export interface AudioModule extends BaseModule {
   };
 }
 
-// Quando você for fazer o leitor de PDF, você só criará isso aqui:
 export interface PdfCropModule extends BaseModule {
   type: 'pdf_crop';
   data: {
     filePath: string;
     page: number;
-    cropCoordinates?: { x: number, y: number, w: number, h: number }; 
+    // NOSSO NOVO SISTEMA DE MARCA-PÁGINAS
+    bookmarks?: { id: string; name: string; page: number }[];
   };
 }
 
