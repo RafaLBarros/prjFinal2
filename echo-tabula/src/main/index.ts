@@ -2,6 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, dialog, protocol, net } from 'elect
 import { join, basename } from 'path' // basename foi adicionado aqui
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
+import { autoUpdater } from 'electron-updater';
 import icon from '../../resources/icon.png?asset'
 
 import fs from 'fs/promises'
@@ -246,6 +247,8 @@ app.whenReady().then(async () => {
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
+
+  autoUpdater.checkForUpdatesAndNotify();
 })
 
 app.on('window-all-closed', () => {

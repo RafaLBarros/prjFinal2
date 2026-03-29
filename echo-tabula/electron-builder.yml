@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: echo-tabula
+appId: com.rafael.echotabula
+productName: Echo Tabula
 directories:
   buildResources: build
 files:
@@ -11,13 +11,19 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
+# NOVO: CONFIGURAÇÃO DO INSTALADOR (NSIS)
 win:
-  executableName: echo-tabula
+  executableName: EchoTabula
+  target:
+    - target: nsis
+      arch:
+        - x64
+
 nsis:
-  artifactName: ${name}-${version}-setup.${ext}
-  shortcutName: ${productName}
-  uninstallDisplayName: ${productName}
-  createDesktopShortcut: always
+  oneClick: true # Faz a instalação ser rápida (Next > Next automático)
+  perMachine: false # Instala só pro usuário atual (evita pedir senha de Administrador)
+  allowToChangeInstallationDirectory: false
+  shortcutName: Echo Tabula
 mac:
   entitlementsInherit: build/entitlements.mac.plist
   extendInfo:
@@ -38,8 +44,12 @@ linux:
 appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
+
+# NOVO: A BÚSSOLA DO GITHUB (AQUI RESOLVEMOS O SEU SUBDIRETÓRIO)
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: RafaLBarros # Substitua pelo seu @ do GitHub!
+  repo: prjFinal2 # O nome EXATO do seu repositório
+
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
