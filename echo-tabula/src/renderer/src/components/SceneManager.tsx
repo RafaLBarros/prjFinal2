@@ -240,10 +240,12 @@ return (
         <button onClick={() => handleAddModule('pdf_crop')} className="flex items-center gap-2 px-5 py-2.5 hover:bg-slate-700 rounded-xl transition text-red-400 font-medium text-sm">
           <span className="text-xl">📕</span> Livro/PDF
         </button>
+        <div className="w-px bg-slate-700 my-2"></div>
         <button 
           onClick={() => handleAddModule('encounter')} className="flex items-center gap-2 px-5 py-2.5 hover:bg-slate-700 rounded-xl transition text-amber-500 font-medium text-sm">
           <span className="text-xl">⚔️</span> Combate
         </button>
+        <div className="w-px bg-slate-700 my-2"></div>
         <button 
           onClick={() => handleAddModule('dice_roller')} className="flex items-center gap-2 px-5 py-2.5 hover:bg-slate-700 rounded-xl transition text-indigo-600 font-medium text-sm">
           <span className="text-xl">🎲</span> Dados
