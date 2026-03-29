@@ -1,6 +1,7 @@
 // src/renderer/src/components/Sidebar.tsx
 import { useState } from 'react';
 import { CampaignNode } from '../types/rpg';
+import packageJson from '../../../../package.json';
 
 interface SidebarProps {
   nodes: CampaignNode[];
@@ -134,11 +135,29 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
 }
 
 export function Sidebar(props: SidebarProps) {
+  // Descobre se estamos desenhando a lista principal (raiz) ou uma sub-pasta
+  const isRoot = props.level === undefined || props.level === 0;
+
   return (
-    <div className="w-full flex flex-col gap-[2px]">
-      {props.nodes.map((node) => (
-        <SidebarNode key={node.id} node={node} props={props} />
-      ))}
+    // Se for a raiz, forçamos ele a ocupar a altura toda para o mt-auto funcionar
+    <div className={`w-full flex flex-col gap-[2px] ${isRoot ? 'h-full' : ''}`}>
+      
+      {/* 1. A LISTA DE PASTAS E CENAS */}
+      <div className="flex flex-col gap-[2px]">
+        {props.nodes.map((node) => (
+          <SidebarNode key={node.id} node={node} props={props} />
+        ))}
+      </div>
+
+      {/* 2. A VERSÃO (SÓ APARECE NA RAIZ!) */}
+      {isRoot && (
+        <div className="mt-auto pb-2 pt-10 w-full flex justify-center">
+          <span className="text-[10px] text-slate-500/50 font-mono font-bold select-none pointer-events-none">
+            v{packageJson.version}
+          </span>
+        </div>
+      )}
+      
     </div>
   );
 }
