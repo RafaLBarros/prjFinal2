@@ -11,7 +11,8 @@ files:
   - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
 asarUnpack:
   - resources/**
-# NOVO: CONFIGURAÇÃO DO INSTALADOR (NSIS)
+
+# CONFIGURAÇÃO DO INSTALADOR (NSIS)
 win:
   executableName: EchoTabula
   target:
@@ -20,36 +21,18 @@ win:
         - x64
 
 nsis:
-  oneClick: true # Faz a instalação ser rápida (Next > Next automático)
-  perMachine: false # Instala só pro usuário atual (evita pedir senha de Administrador)
+  oneClick: true 
+  perMachine: false 
   allowToChangeInstallationDirectory: false
   shortcutName: Echo Tabula
-mac:
-  entitlementsInherit: build/entitlements.mac.plist
-  extendInfo:
-    - NSCameraUsageDescription: Application requests access to the device's camera.
-    - NSMicrophoneUsageDescription: Application requests access to the device's microphone.
-    - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
-    - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
-  notarize: false
-dmg:
-  artifactName: ${name}-${version}.${ext}
-linux:
-  target:
-    - AppImage
-    - snap
-    - deb
-  maintainer: electronjs.org
-  category: Utility
-appImage:
-  artifactName: ${name}-${version}.${ext}
+
 npmRebuild: false
 
-# NOVO: A BÚSSOLA DO GITHUB (AQUI RESOLVEMOS O SEU SUBDIRETÓRIO)
+# A BÚSSOLA DO GITHUB
 publish:
   provider: github
-  owner: RafaLBarros # Substitua pelo seu @ do GitHub!
-  repo: prjFinal2 # O nome EXATO do seu repositório
+  owner: RafaLBarros
+  repo: prjFinal2
 
 electronDownload:
   mirror: https://npmmirror.com/mirrors/electron/
