@@ -1,8 +1,9 @@
 // src/renderer/src/components/SceneManager.tsx
-import { CampaignNode, RpgModule, TextModule as TextType, AudioModule as AudioType, PdfCropModule as PdfType } from '../types/rpg';
+import { CampaignNode, RpgModule, TextModule as TextType, AudioModule as AudioType, PdfCropModule as PdfType, EncounterModule as EncounterType} from '../types/rpg';
 import { TextModule } from './TextModule';
 import { AudioModule } from './AudioModule';
 import { PdfModule } from './PdfModule';
+import { EncounterModule } from './EncounterModule'; // Adicione junto aos outros imports de módulos
 import { useState, useRef } from 'react';
 
 interface Props {
@@ -42,10 +43,11 @@ export function SceneManager({ scene, onUpdateModules, onRenameScene }: Props) {
       newModule = { id: newId, type: 'text', name: 'Nova Anotação', isActive: true, data: { content: '' } } as TextType;
     } else if (type === 'audio') {
       newModule = { id: newId, type: 'audio', name: 'Nova Trilha Sonora', isActive: true, data: { urlOrPath: '', volume: 0.5, loop: true } } as AudioType;
-    } else {
+    } else if (type === 'pdf_crop'){
       newModule = { id: newId, type: 'pdf_crop', name: 'Novo Manuscrito', isActive: true, data: { filePath: '', page: 1 } } as PdfType;
+    }else {
+      newModule = { id: newId, type: 'encounter', name: 'Novo Combate', isActive: true, data: { round: 1, currentTurnId: null, combatants: [] } } as EncounterType;
     }
-
     onUpdateModules(scene.id, [...modules, newModule]);
   };
 
@@ -204,7 +206,8 @@ return (
                 {mod.type === 'text' && <TextModule moduleData={mod as TextType} onUpdate={handleUpdateModule} />}
                 {mod.type === 'audio' && <AudioModule moduleData={mod as AudioType} onUpdate={handleUpdateModule} />}
                 {mod.type === 'pdf_crop' && <PdfModule moduleData={mod as PdfType} onUpdate={handleUpdateModule} />}
-                
+                {mod.type === 'encounter' && <EncounterModule moduleData={mod as EncounterType} onUpdate={handleUpdateModule} />}
+
                 <button 
                   onClick={() => handleDeleteModule(mod.id)}
                   className="absolute -top-3 -right-3 bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 group-hover:scale-100 flex items-center justify-center font-bold z-10"
@@ -232,6 +235,10 @@ return (
         <div className="w-px bg-slate-700 my-2"></div>
         <button onClick={() => handleAddModule('pdf_crop')} className="flex items-center gap-2 px-5 py-2.5 hover:bg-slate-700 rounded-xl transition text-red-400 font-medium text-sm">
           <span className="text-xl">📕</span> Livro/PDF
+        </button>
+        <button 
+          onClick={() => handleAddModule('encounter')} className="flex items-center gap-2 px-5 py-2.5 hover:bg-slate-700 rounded-xl transition text-amber-500 font-medium text-sm">
+          <span className="text-xl">⚔️</span> Combate
         </button>
       </div>
 

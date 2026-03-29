@@ -41,11 +41,39 @@ export interface PdfCropModule extends BaseModule {
   };
 }
 
+// --- SISTEMA DE COMBATE (ENCOUNTER) ---
+
+export interface CombatantEffect {
+  id: string;
+  name: string;
+  duration: number; // Quantas rodadas faltam para acabar
+}
+
+export interface Combatant {
+  id: string;
+  name: string;
+  initiative: number;
+  hp?: number; 
+  maxHp?: number; 
+  faction: 'enemy' | 'ally' | 'player'; // <-- Sem interrogação, agora é a lei!
+  isDefeated: boolean; 
+  effects: CombatantEffect[]; 
+}
+
+export interface EncounterModule extends BaseModule {
+  type: 'encounter';
+  data: {
+    round: number; // Rodada global do combate
+    currentTurnId: string | null; // Quem está jogando AGORA
+    combatants: Combatant[];
+  };
+}
+
 // ---------------------------------------------------------
 // 3. A UNIÃO (O Segredo da Escalabilidade)
 // Isso cria um tipo único que aceita QUALQUER um dos módulos listados.
 // ---------------------------------------------------------
-export type RpgModule = TextModule | AudioModule | PdfCropModule; 
+export type RpgModule = TextModule | AudioModule | PdfCropModule | EncounterModule; 
 
 
 // ---------------------------------------------------------
