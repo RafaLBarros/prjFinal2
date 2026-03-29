@@ -249,6 +249,29 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
+  // --- EVENTOS VISUAIS DO UPDATER ---
+  autoUpdater.on('update-available', () => {
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Atualização Encontrada',
+      message: 'Uma nova versão do Echo Tabula foi encontrada! Baixando no fundo...'
+    });
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    dialog.showMessageBox({
+      type: 'info',
+      title: 'Atualização Pronta',
+      message: 'Download concluído! O aplicativo será atualizado na próxima vez que você abrir.'
+    });
+  });
+
+  autoUpdater.on('error', (error) => {
+    // Isso aqui vai te salvar de ficar adivinhando o que deu errado!
+    dialog.showErrorBox('Erro na Atualização', error == null ? "Erro desconhecido" : (error.stack || error).toString());
+  });
+
+  // Dispara a checagem
   autoUpdater.checkForUpdatesAndNotify();
 })
 
