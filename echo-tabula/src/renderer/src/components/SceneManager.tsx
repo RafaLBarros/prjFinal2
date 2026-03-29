@@ -1,9 +1,10 @@
 // src/renderer/src/components/SceneManager.tsx
-import { CampaignNode, RpgModule, TextModule as TextType, AudioModule as AudioType, PdfCropModule as PdfType, EncounterModule as EncounterType} from '../types/rpg';
+import { CampaignNode, RpgModule, TextModule as TextType, AudioModule as AudioType, PdfCropModule as PdfType, EncounterModule as EncounterType, DiceRollerModule as DiceRollerType} from '../types/rpg';
 import { TextModule } from './TextModule';
 import { AudioModule } from './AudioModule';
 import { PdfModule } from './PdfModule';
-import { EncounterModule } from './EncounterModule'; // Adicione junto aos outros imports de módulos
+import { EncounterModule } from './EncounterModule';
+import { DiceRollerModule } from './DiceRollerModule';
 import { useState, useRef } from 'react';
 
 interface Props {
@@ -45,8 +46,10 @@ export function SceneManager({ scene, onUpdateModules, onRenameScene }: Props) {
       newModule = { id: newId, type: 'audio', name: 'Nova Trilha Sonora', isActive: true, data: { urlOrPath: '', volume: 0.5, loop: true } } as AudioType;
     } else if (type === 'pdf_crop'){
       newModule = { id: newId, type: 'pdf_crop', name: 'Novo Manuscrito', isActive: true, data: { filePath: '', page: 1 } } as PdfType;
-    }else {
+    }else if (type === 'encounter') {
       newModule = { id: newId, type: 'encounter', name: 'Novo Combate', isActive: true, data: { round: 1, currentTurnId: null, combatants: [] } } as EncounterType;
+    } else {
+      newModule = { id: newId, type: 'dice_roller', name: 'Mesa de Dados', isActive: true, data: { presets: [] } } as DiceRollerType;
     }
     onUpdateModules(scene.id, [...modules, newModule]);
   };
@@ -207,6 +210,7 @@ return (
                 {mod.type === 'audio' && <AudioModule moduleData={mod as AudioType} onUpdate={handleUpdateModule} />}
                 {mod.type === 'pdf_crop' && <PdfModule moduleData={mod as PdfType} onUpdate={handleUpdateModule} />}
                 {mod.type === 'encounter' && <EncounterModule moduleData={mod as EncounterType} onUpdate={handleUpdateModule} />}
+                {mod.type === 'dice_roller' && <DiceRollerModule moduleData={mod as DiceRollerType} onUpdate={handleUpdateModule} />}
 
                 <button 
                   onClick={() => handleDeleteModule(mod.id)}
@@ -239,6 +243,10 @@ return (
         <button 
           onClick={() => handleAddModule('encounter')} className="flex items-center gap-2 px-5 py-2.5 hover:bg-slate-700 rounded-xl transition text-amber-500 font-medium text-sm">
           <span className="text-xl">⚔️</span> Combate
+        </button>
+        <button 
+          onClick={() => handleAddModule('dice_roller')} className="flex items-center gap-2 px-5 py-2.5 hover:bg-slate-700 rounded-xl transition text-indigo-600 font-medium text-sm">
+          <span className="text-xl">🎲</span> Dados
         </button>
       </div>
 

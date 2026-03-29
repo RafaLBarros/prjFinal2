@@ -69,11 +69,36 @@ export interface EncounterModule extends BaseModule {
   };
 }
 
+
+// --- SISTEMA DE DADOS (DICE ROLLER) ---
+
+export interface DicePreset {
+  id: string;
+  name: string;
+  dice: {
+    d4: number;
+    d6: number;
+    d8: number;
+    d10: number;
+    d12: number;
+    d20: number;
+    d100: number;
+  };
+  modifier: number; // O bônus mágico (ex: +4)
+}
+
+export interface DiceRollerModule extends BaseModule {
+  type: 'dice_roller';
+  data: {
+    presets: DicePreset[];
+  };
+}
+
 // ---------------------------------------------------------
 // 3. A UNIÃO (O Segredo da Escalabilidade)
 // Isso cria um tipo único que aceita QUALQUER um dos módulos listados.
 // ---------------------------------------------------------
-export type RpgModule = TextModule | AudioModule | PdfCropModule | EncounterModule; 
+export type RpgModule = TextModule | AudioModule | PdfCropModule | EncounterModule | DiceRollerModule; 
 
 
 // ---------------------------------------------------------
