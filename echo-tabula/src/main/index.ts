@@ -3,6 +3,7 @@ import { join, basename } from 'path' // basename foi adicionado aqui
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater';
+import log from "electron-log/main";
 import icon from '../../resources/icon.png?asset'
 
 import fs from 'fs/promises'
@@ -271,8 +272,34 @@ app.whenReady().then(async () => {
     dialog.showErrorBox('Erro na Atualização', error == null ? "Erro desconhecido" : (error.stack || error).toString());
   });
 
-  // Dispara a checagem
-  autoUpdater.checkForUpdatesAndNotify();
+  autoUpdater.logger = log;
+
+  autoUpdater.on('checking-for-update', () => {
+    log.info("🔍 Checking for update...");
+  });
+
+  autoUpdater.on('update-available', () => {
+    log.info("✅ Update available!");
+  });
+
+  autoUpdater.on('update-not-available', () => {
+    log.info("❌ No update available");
+  });
+
+  autoUpdater.on('error', (err) => {
+    log.error("💥 Update error:", err);
+  });
+
+  autoUpdater.on('download-progress', (progress) => {
+    log.info(`📦 Downloading: ${progress.percent}%`);
+  });
+
+  autoUpdater.on('update-downloaded', () => {
+    log.info("🎉 Update downloaded!");
+  });
+
+  // IMPORTANTE: usa esse aqui pra debug
+  autoUpdater.checkForUpdates();
 })
 
 app.on('window-all-closed', () => {
