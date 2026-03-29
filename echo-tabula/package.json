@@ -1,10 +1,10 @@
 {
   "name": "echo-tabula",
-  "version": "1.0.4",
-  "description": "An Electron application with React and TypeScript",
+  "version": "1.0.5",
+  "description": "Uma Aplicação de Gerenciamento de Campanhas para RPGs de Mesa",
   "main": "./out/main/index.js",
-  "author": "example.com",
-  "homepage": "https://electron-vite.org",
+  "author": "Rafael Lopes de Barros",
+  "homepage": "https://github.com/RafaLBarros/prjFinal2",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache .",
