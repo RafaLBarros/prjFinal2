@@ -1,6 +1,6 @@
 // src/renderer/src/components/PdfModule.tsx
 import { PdfCropModule as PdfModuleType, RpgModule } from '../types/rpg';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
@@ -18,6 +18,35 @@ interface Props {
 export function PdfModule({ moduleData, onUpdate }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [numPages, setNumPages] = useState<number>();
+
+  // NOVO: Estado temporário para o campo de digitação
+  const [inputPage, setInputPage] = useState(moduleData.data.page.toString());
+
+  // NOVO: Mantém o campo de texto sincronizado caso você use as setinhas
+  useEffect(() => {
+    setInputPage(moduleData.data.page.toString());
+  }, [moduleData.data.page]);
+
+  // NOVO: Função que valida o número e manda o PDF mudar de página
+  const handlePageSubmit = () => {
+    let newPage = parseInt(inputPage, 10);
+
+    // Se o usuário digitou besteira ou número menor que 1, vai pra pág 1
+    if (isNaN(newPage) || newPage < 1) {
+      newPage = 1;
+    } 
+    // Se digitou um número maior que o livro, vai pra última
+    else if (numPages && newPage > numPages) {
+      newPage = numPages;
+    }
+
+    setInputPage(newPage.toString()); // Atualiza o texto na tela
+
+    // Só envia pro banco de dados se a página realmente mudou
+    if (newPage !== moduleData.data.page) {
+      onUpdate(moduleData.id, { data: { ...moduleData.data, page: newPage } });
+    }
+  };
 
   // NOVO: Derivamos a fonte do PDF diretamente do filePath salvo no JSON.
   // Sem useEffect, sem estado Base64 pesado. O React-PDF já entende o rpg://!
@@ -128,24 +157,39 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
           {/* --- O VISUALIZADOR DE PDF --- */}
           <div className="p-4 flex flex-col items-center bg-slate-950 overflow-hidden">
             
-            {/* Barra de Paginação */}
+            {/* --- BARRA DE PAGINAÇÃO INTERATIVA --- */}
             {moduleData.data.filePath && (
-              <div className="flex items-center gap-4 mb-4 bg-slate-800 p-2 rounded-full border border-slate-700">
+              <div className="flex items-center gap-3 mb-4 bg-slate-800 p-2 rounded-full border border-slate-700">
+                
                 <button 
                   onClick={goToPrevPage} disabled={moduleData.data.page <= 1}
                   className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
                 >
                   ◀
                 </button>
-                <span className="text-sm text-slate-300 font-mono w-24 text-center">
-                  Pág {moduleData.data.page} de {numPages || '?'}
-                </span>
+                
+                {/* O NOVO INPUT DE PÁGINA */}
+                <div className="flex items-center gap-2 text-sm text-slate-300 font-mono">
+                  <span>Pág</span>
+                  <input
+                    type="text"
+                    value={inputPage}
+                    onChange={(e) => setInputPage(e.target.value)}
+                    onBlur={handlePageSubmit} // Muda a página ao clicar fora
+                    onKeyDown={(e) => e.key === 'Enter' && handlePageSubmit()} // Muda a página ao dar Enter
+                    className="w-12 bg-slate-900 border border-slate-600 rounded text-center focus:outline-none focus:border-red-500 text-emerald-400 font-bold transition-colors"
+                    title="Digite a página e aperte Enter"
+                  />
+                  <span>de {numPages || '?'}</span>
+                </div>
+
                 <button 
                   onClick={goToNextPage} disabled={!numPages || moduleData.data.page >= numPages}
                   className="w-8 h-8 flex items-center justify-center bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 transition"
                 >
                   ▶
                 </button>
+
               </div>
             )}
 
