@@ -1,5 +1,6 @@
 appId: com.rafael.echotabula
 productName: Echo Tabula
+artifactName: ${productName}-Setup-${version}.${ext}
 directories:
   buildResources: build
 files:
