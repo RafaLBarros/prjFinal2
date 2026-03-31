@@ -150,8 +150,48 @@ export default function App() {
     if (activeSceneId === targetId) setActiveSceneId(null); // Limpa o palco se excluiu a cena atual
   };
 
+  // --- FUNÇÃO AUXILIAR: DETECTOR DE PARADOXO ---
+  const isDescendant = (treeNodes: CampaignNode[], draggedId: string, targetId: string): boolean => {
+    // 1. Acha o nó que está sendo arrastado
+    const findNode = (nodes: CampaignNode[], id: string): CampaignNode | null => {
+      for (const node of nodes) {
+        if (node.id === id) return node;
+        if (node.children) {
+          const found = findNode(node.children, id);
+          if (found) return found;
+        }
+      }
+      return null;
+    };
+
+    const draggedNode = findNode(treeNodes, draggedId);
+    
+    // Se o nó não foi achado ou não tem filhos (é uma cena), é impossível gerar paradoxo
+    if (!draggedNode || !draggedNode.children) return false;
+
+    // 2. Vasculha todos os filhos (e netos) para ver se o alvo está lá dentro
+    const checkChildren = (children: CampaignNode[]): boolean => {
+      for (const child of children) {
+        if (child.id === targetId) return true;
+        if (child.children && checkChildren(child.children)) return true;
+      }
+      return false;
+    };
+
+    return checkChildren(draggedNode.children);
+  };
+
   // --- FUNÇÃO ATUALIZADA: MOVER NÓ COM REORDENAÇÃO ---
   const handleMoveNode = (draggedId: string, targetId: string | null, position: 'before' | 'after' | 'inside' = 'inside') => {
+    
+    // 🛡️ O ESCUDO ANTI-PARADOXO ENTRA AQUI!
+    // Se o usuário soltar a pasta nela mesma, ou dentro de um filho dela, a ação é cancelada.
+    if (draggedId === targetId) return;
+    if (targetId && isDescendant(tree, draggedId, targetId)) {
+      console.warn("Ação bloqueada: Uma pasta não pode ser movida para dentro de seus próprios filhos.");
+      return; 
+    }
+    
     let draggedNode: CampaignNode | null = null;
 
     // Etapa 1: Arranca o nó de onde ele estava
