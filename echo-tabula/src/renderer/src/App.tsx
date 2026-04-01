@@ -481,7 +481,7 @@ export default function App() {
       </div>
 
       {/* --- PALCO PRINCIPAL (Direita) --- */}
-      <div className="flex-1 flex flex-col overflow-hidden bg-[url('https://www.transparenttextures.com/patterns/cubes.png')] bg-opacity-5 relative">
+      <div className="flex-1 flex flex-col overflow-hidden relative">
         {activeScene ? (
           <SceneManager 
             scene={activeScene} 
