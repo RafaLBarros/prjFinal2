@@ -1,14 +1,13 @@
 import { app, shell, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
-import { join, basename } from 'path' // basename foi adicionado aqui
+import { join, basename } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { autoUpdater } from 'electron-updater';
-import log from "electron-log/main";
+import { autoUpdater } from 'electron-updater'
+import log from "electron-log/main"
 import icon from '../../resources/icon.png?asset'
-
 import fs from 'fs/promises'
 
-// 1. ELEVAÇÃO DE PRIVILÉGIOS (Antes do app.whenReady)
+// 1. ELEVAÇÃO DE PRIVILÉGIOS (Apenas o protocolo local do cofre)
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'rpg',
@@ -16,17 +15,15 @@ protocol.registerSchemesAsPrivileged([
       standard: true, 
       secure: true, 
       supportFetchAPI: true, 
-      corsEnabled: true,
-      bypassCSP: true, // <-- Adicionado
-      stream: true     // <-- Adicionado
+      corsEnabled: true, 
+      bypassCSP: true, 
+      stream: true 
     }
   }
 ])
 
 // --- INÍCIO DA NOSSA API DE ARQUIVOS ---
-
-// 1. Ouvinte para SELECIONAR arquivo (Textos)
-ipcMain.handle('dialog:openFile', async () => { /* ... mantido igual ... */
+ipcMain.handle('dialog:openFile', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
     filters: [{ name: 'Textos/JSON', extensions: ['txt', 'json', 'md'] }]
@@ -35,8 +32,7 @@ ipcMain.handle('dialog:openFile', async () => { /* ... mantido igual ... */
   return { success: true, path: filePaths[0] }
 })
 
-// 2. Ouvinte para LER arquivo (Textos)
-ipcMain.handle('fs:readFile', async (_, path) => { /* ... mantido igual ... */
+ipcMain.handle('fs:readFile', async (_, path) => {
   try {
     const content = await fs.readFile(path, 'utf-8')
     return { success: true, content }
@@ -45,8 +41,7 @@ ipcMain.handle('fs:readFile', async (_, path) => { /* ... mantido igual ... */
   }
 })
 
-// 3. Ouvinte para SALVAR arquivo
-ipcMain.handle('fs:saveFile', async (_, { path, content }) => { /* ... mantido igual ... */
+ipcMain.handle('fs:saveFile', async (_, { path, content }) => {
   try {
     await fs.writeFile(path, content, 'utf-8')
     return { success: true }
@@ -55,50 +50,43 @@ ipcMain.handle('fs:saveFile', async (_, { path, content }) => { /* ... mantido i
   }
 })
 
-// 4. Ouvinte para ESCOLHER ONDE SALVAR (Save As...)
-ipcMain.handle('dialog:saveFile', async () => { /* ... mantido igual ... */
+ipcMain.handle('dialog:saveFile', async () => {
   const { canceled, filePath } = await dialog.showSaveDialog({
     title: 'Salvar Cena do RPG',
     defaultPath: 'nova-cena.json',
     filters: [{ name: 'JSON RPG', extensions: ['json'] }]
-  });
-  
-  if (canceled) return { success: false };
-  return { success: true, path: filePath };
-});
+  })
+  if (canceled) return { success: false }
+  return { success: true, path: filePath }
+})
 
-// 5. NOVO OUVINTE: IMPORTAR ARQUIVO PARA O COFRE (Assets)
-// Fica organizado aqui fora junto com os outros!
 ipcMain.handle('fs:importAsset', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Importar Mídia para a Campanha',
     properties: ['openFile'],
-    filters: [{ name: 'Arquivos RPG', extensions: ['pdf', 'mp3', 'wav'] }]
+    filters: [{ name: 'Arquivos de Áudio', extensions: ['mp3', 'wav', 'ogg'] }] // Focado em áudio agora!
   })
 
   if (canceled || filePaths.length === 0) return { success: false }
 
   const sourcePath = filePaths[0]
   const fileName = basename(sourcePath)
-  
-  // Pegamos o caminho do Cofre na hora que o usuário clica em importar
   const userDataPath = app.getPath('userData')
   const assetsVaultPath = join(userDataPath, 'assets')
   const destPath = join(assetsVaultPath, fileName)
 
   try {
-    // Faz a cópia do arquivo selecionado para dentro da pasta do aplicativo
     await fs.copyFile(sourcePath, destPath)
-    return { success: true, fileName: fileName } // Devolve só o nome pro React!
+    return { success: true, fileName: fileName }
   } catch (error: any) {
     return { success: false, error: error.message }
   }
 })
 
+
 // --- FIM DA NOSSA API DE ARQUIVOS ---
 
 function createWindow(): void {
-  // ... (mantido igualzinho o seu original) ...
   const mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
@@ -114,7 +102,7 @@ function createWindow(): void {
   })
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow.maximize();
+    mainWindow.maximize()
     mainWindow.show()
   })
 
@@ -125,125 +113,130 @@ function createWindow(): void {
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+    mainWindow.webContents.openDevTools({ mode: 'detach' })
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
 
-// O APLICATIVO ACORDOU
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.electron')
 
-  // 1. Ouvinte para LISTAR todas as campanhas no Cofre
+  // COFRE: Campanhas
   ipcMain.handle('fs:listCampaigns', async () => {
     try {
-      const campaignsPath = join(app.getPath('userData'), 'campaigns');
-      // Garante que a pasta existe antes de tentar ler
-      await fs.mkdir(campaignsPath, { recursive: true }).catch(() => {});
-      
-      const files = await fs.readdir(campaignsPath);
-      // Devolve só os arquivos .json
-      return { success: true, files: files.filter(f => f.endsWith('.json')) };
+      const campaignsPath = join(app.getPath('userData'), 'campaigns')
+      await fs.mkdir(campaignsPath, { recursive: true }).catch(() => {})
+      const files = await fs.readdir(campaignsPath)
+      return { success: true, files: files.filter(f => f.endsWith('.json')) }
     } catch (error: any) {
-      return { success: false, error: error.message };
+      return { success: false, error: error.message }
     }
-  });
-
-  // 2. Ouvinte para SALVAR uma campanha direto no Cofre
-  ipcMain.handle('fs:saveCampaign', async (_, { fileName, content }) => {
-    try {
-      const campaignsPath = join(app.getPath('userData'), 'campaigns');
-      await fs.mkdir(campaignsPath, { recursive: true }).catch(() => {});
-      
-      // Garante que o nome termina com .json
-      const safeName = fileName.endsWith('.json') ? fileName : `${fileName}.json`;
-      const fullPath = join(campaignsPath, safeName);
-      
-      await fs.writeFile(fullPath, content, 'utf-8');
-      return { success: true, fileName: safeName };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  // 3. Ouvinte para CARREGAR uma campanha do Cofre
-  ipcMain.handle('fs:loadCampaign', async (_, fileName) => {
-    try {
-      const fullPath = join(app.getPath('userData'), 'campaigns', fileName);
-      const content = await fs.readFile(fullPath, 'utf-8');
-      return { success: true, content };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  // 4. Ouvinte para EXCLUIR uma campanha do Cofre
-  ipcMain.handle('fs:deleteCampaign', async (_, fileName) => {
-    try {
-      const fullPath = join(app.getPath('userData'), 'campaigns', fileName);
-      await fs.rm(fullPath); // Deleta o arquivo do disco
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  // 5. Ouvinte para RENOMEAR uma campanha no Cofre
-  ipcMain.handle('fs:renameCampaign', async (_, { oldName, newName }) => {
-    try {
-      const dir = join(app.getPath('userData'), 'campaigns');
-      const oldPath = join(dir, oldName);
-      
-      // Garante o .json no final do nome novo
-      const safeNewName = newName.endsWith('.json') ? newName : `${newName}.json`;
-      const newPath = join(dir, safeNewName);
-
-      // Verifica se o novo nome já existe (para não apagar outra campanha por acidente)
-      const files = await fs.readdir(dir);
-      if (files.includes(safeNewName) && safeNewName !== oldName) {
-         return { success: false, error: '⚠️ Já existe outra campanha com este nome.' };
-      }
-
-      // Executa a renomeação no Windows
-      await fs.rename(oldPath, newPath);
-      return { success: true, fileName: safeNewName };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  });
-
-  app.on('browser-window-created', (_, window) => {
-    optimizer.watchWindowShortcuts(window)
   })
 
-  ipcMain.on('ping', () => console.log('pong'))
+  ipcMain.handle('fs:saveCampaign', async (_, { fileName, content }) => {
+    try {
+      const campaignsPath = join(app.getPath('userData'), 'campaigns')
+      await fs.mkdir(campaignsPath, { recursive: true }).catch(() => {})
+      const safeName = fileName.endsWith('.json') ? fileName : `${fileName}.json`
+      const fullPath = join(campaignsPath, safeName)
+      await fs.writeFile(fullPath, content, 'utf-8')
+      return { success: true, fileName: safeName }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  })
 
-  // --- PREPARAÇÃO DO COFRE E PROTOCOLO ---
-  
-  // 1. Garante que a pasta "assets" exista no AppData do Windows
+  ipcMain.handle('fs:loadCampaign', async (_, fileName) => {
+    try {
+      const fullPath = join(app.getPath('userData'), 'campaigns', fileName)
+      const content = await fs.readFile(fullPath, 'utf-8')
+      return { success: true, content }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('fs:deleteCampaign', async (_, fileName) => {
+    try {
+      const fullPath = join(app.getPath('userData'), 'campaigns', fileName)
+      await fs.rm(fullPath)
+      return { success: true }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  ipcMain.handle('fs:renameCampaign', async (_, { oldName, newName }) => {
+    try {
+      const dir = join(app.getPath('userData'), 'campaigns')
+      const oldPath = join(dir, oldName)
+      const safeNewName = newName.endsWith('.json') ? newName : `${newName}.json`
+      const newPath = join(dir, safeNewName)
+
+      const files = await fs.readdir(dir)
+      if (files.includes(safeNewName) && safeNewName !== oldName) {
+         return { success: false, error: '⚠️ Já existe outra campanha com este nome.' }
+      }
+
+      await fs.rename(oldPath, newPath)
+      return { success: true, fileName: safeNewName }
+    } catch (error: any) {
+      return { success: false, error: error.message }
+    }
+  })
+
+  // NOVO OUVINTE: ESCOLHER ARQUIVO DIRETAMENTE DO COFRE
+  ipcMain.handle('fs:selectFromVault', async () => {
+    const assetsVaultPath = join(app.getPath('userData'), 'assets')
+    
+    // Garante que a pasta existe
+    await fs.mkdir(assetsVaultPath, { recursive: true }).catch(() => {})
+
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: 'Escolher Áudio do Cofre',
+      defaultPath: assetsVaultPath, // O explorador já abre direto dentro do Cofre!
+      properties: ['openFile'],
+      filters: [{ name: 'Arquivos de Áudio', extensions: ['mp3', 'wav', 'ogg'] }]
+    })
+
+    if (canceled || filePaths.length === 0) return { success: false }
+
+    const sourcePath = filePaths[0]
+    const fileName = basename(sourcePath)
+    const destPath = join(assetsVaultPath, fileName)
+
+    // Tratamento à prova de balas: se o usuário navegou pra fora do cofre sem querer 
+    // e escolheu um arquivo de outra pasta, nós importamos ele automaticamente.
+    if (sourcePath !== destPath) {
+      try {
+        await fs.copyFile(sourcePath, destPath)
+      } catch (error) {
+        console.error("Erro ao copiar arquivo errante para o cofre:", error)
+      }
+    }
+
+    // Devolve só o nome do arquivo para o React montar o rpg://
+    return { success: true, fileName: fileName }
+  })
+
+  // --- MOTOR DE REDE: ARQUIVOS LOCAIS (rpg://) ---
   const userDataPath = app.getPath('userData')
   const assetsVaultPath = join(userDataPath, 'assets')
   await fs.mkdir(assetsVaultPath, { recursive: true }).catch(() => {})
 
-  // 2. Ensina o motor de rede a responder quando o React pedir um "rpg://"
   protocol.handle('rpg', (request) => {
-    // 1. Tira o "rpg://" da frente
-    let rawString = request.url.replace('rpg://', '');
-    
-    // 2. Remove a barra "/" fantasma do final (se o navegador tiver colocado)
-    if (rawString.endsWith('/')) {
-      rawString = rawString.slice(0, -1);
-    }
+    let rawString = request.url.replace('rpg://', '')
+    if (rawString.endsWith('/')) rawString = rawString.slice(0, -1)
+    const fileName = decodeURIComponent(rawString)
+    const absolutePath = join(assetsVaultPath, fileName)
+    const fileUrl = pathToFileURL(absolutePath).toString()
+    return net.fetch(fileUrl)
+  })
 
-    // 3. Conserta espaços no nome (ex: %20 vira espaço normal)
-    const fileName = decodeURIComponent(rawString);
-    
-    // 4. Junta o caminho absoluto do Windows e converte para URL nativa
-    const absolutePath = join(assetsVaultPath, fileName);
-    const fileUrl = pathToFileURL(absolutePath).toString();
-    
-    return net.fetch(fileUrl);
-  });
+   app.on('browser-window-created', (_, window) => {
+    optimizer.watchWindowShortcuts(window)
+  })
 
   createWindow()
 
@@ -252,59 +245,26 @@ app.whenReady().then(async () => {
   })
 
   // --- EVENTOS VISUAIS DO UPDATER ---
-  autoUpdater.on('update-available', () => {
-    dialog.showMessageBox({
-      type: 'info',
-      title: 'Atualização Encontrada',
-      message: 'Uma nova versão do Echo Tabula foi encontrada! Baixando no fundo...'
-    });
-  });
-
-  autoUpdater.on('update-downloaded', () => {
-    dialog.showMessageBox({
-      type: 'info',
-      title: 'Atualização Pronta',
-      message: 'Download concluído! O aplicativo será atualizado na próxima vez que você abrir.'
-    });
-  });
-
-  autoUpdater.on('error', (error) => {
-    // Isso aqui vai te salvar de ficar adivinhando o que deu errado!
-    dialog.showErrorBox('Erro na Atualização', error == null ? "Erro desconhecido" : (error.stack || error).toString());
-  });
-
   autoUpdater.logger = log;
-
-  autoUpdater.on('checking-for-update', () => {
-    log.info("🔍 Checking for update...");
-  });
-
+  autoUpdater.on('checking-for-update', () => log.info("🔍 Checking for update..."));
   autoUpdater.on('update-available', () => {
     log.info("✅ Update available!");
+    dialog.showMessageBox({ type: 'info', title: 'Atualização Encontrada', message: 'Nova versão em download...' });
   });
-
-  autoUpdater.on('update-not-available', () => {
-    log.info("❌ No update available");
-  });
-
+  autoUpdater.on('update-not-available', () => log.info("❌ No update available"));
   autoUpdater.on('error', (err) => {
     log.error("💥 Update error:", err);
+    dialog.showErrorBox('Erro na Atualização', err == null ? "Erro desconhecido" : (err.stack || err).toString());
   });
-
-  autoUpdater.on('download-progress', (progress) => {
-    log.info(`📦 Downloading: ${progress.percent}%`);
-  });
-
+  autoUpdater.on('download-progress', (progress) => log.info(`📦 Downloading: ${progress.percent}%`));
   autoUpdater.on('update-downloaded', () => {
     log.info("🎉 Update downloaded!");
+    dialog.showMessageBox({ type: 'info', title: 'Atualização Pronta', message: 'Download concluído!' });
   });
 
-  // IMPORTANTE: usa esse aqui pra debug
   autoUpdater.checkForUpdates();
 })
 
 app.on('window-all-closed', () => {
-  if (process.platform !== 'darwin') {
-    app.quit()
-  }
+  if (process.platform !== 'darwin') app.quit()
 })
