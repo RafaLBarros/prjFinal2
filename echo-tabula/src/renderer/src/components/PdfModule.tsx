@@ -26,6 +26,9 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   const [isAddingBookmark, setIsAddingBookmark] = useState(false);
   const [newBookmarkName, setNewBookmarkName] = useState('');
 
+  // 👇 NOVO ESTADO: A bandeira da câmera dinâmica 👇
+  const [pendingAutoScroll, setPendingAutoScroll] = useState(false);
+
   // Puxa os marca-páginas salvos (ou inicia um array vazio se for um PDF novo)
   const bookmarks: { id: string, name: string, page: number }[] = moduleData.data.bookmarks || [];
 
@@ -96,10 +99,43 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
 
   const pdfSource = getPdfSource();
 
+  // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
+  useEffect(() => {
+    const handleModuleAction = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { targetId, action, payload } = customEvent.detail;
+
+      // Se o grito não for pra esse PDF, ignora
+      if (targetId !== moduleData.id) return;
+
+      // Se a ação for "abrir marca página"
+      if (action === 'openBookmark' && payload?.bookmarkId) {
+        const targetBookmark = bookmarks.find(b => b.id === payload.bookmarkId);
+        
+        if (targetBookmark) {
+          // 1. Atualiza o input visual
+          setInputPage(targetBookmark.page.toString());
+          
+          // 🎥 2. Levanta a bandeira: Avisa o PDF para centralizar a tela quando terminar de carregar!
+          setPendingAutoScroll(true);
+          
+          // 3. Avisa o Pai para mudar a página E expandir o módulo
+          onUpdate(moduleData.id, {
+            isMinimized: false,
+            data: { ...moduleData.data, page: targetBookmark.page }
+          });
+        }
+      }
+    };
+
+    window.addEventListener('rpg-module-action', handleModuleAction);
+    return () => window.removeEventListener('rpg-module-action', handleModuleAction);
+  }, [moduleData.id, moduleData.data, bookmarks, onUpdate]);
+
   // NOVO: A Lógica de Cópia (Upload)
   const handleImportPdf = async () => {
     // 1. Pede pro Mestre abrir a janela e copiar o arquivo
-    const result = await window.api.importAsset();
+    const result = await window.api.importPdf();
     
     // 2. Se deu certo, o Mestre nos devolve apenas o NOME do arquivo copiando (ex: livro.pdf)
     if (result.success && result.fileName) {
@@ -132,7 +168,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   if (!moduleData.isActive) return null;
 
   return (
-    <div className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500">
+    <div id={`module-${moduleData.id}`} className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500">
       
       {/* --- CABEÇALHO ATUALIZADO --- */}
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
@@ -288,11 +324,21 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
                   error={<p className="text-red-500 py-10">Erro ao renderizar o PDF.</p>}
                 >
                   <Page 
-                    pageNumber={moduleData.data.page} 
-                    renderTextLayer={false} 
-                    renderAnnotationLayer={false}
-                    width={600} 
-                  />
+                  pageNumber={moduleData.data.page} 
+                  renderTextLayer={false} 
+                  renderAnnotationLayer={false}
+                  width={600} 
+                  // 👇 A MÁGICA ACONTECE AQUI 👇
+                  onRenderSuccess={() => {
+                    if (pendingAutoScroll) {
+                      // Dá um micro-atraso de 50ms só para o navegador recalcular a altura da <div>
+                      setTimeout(() => {
+                        document.getElementById(`module-${moduleData.id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        setPendingAutoScroll(false); // Abaixa a bandeira
+                      }, 50);
+                    }
+                  }}
+                />
                 </Document>
               </div>
             ) : (

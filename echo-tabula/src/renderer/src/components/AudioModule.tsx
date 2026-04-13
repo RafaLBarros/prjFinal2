@@ -15,6 +15,37 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const url = moduleData.data.urlOrPath || "";
 
+  // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
+  useEffect(() => {
+    // A função que será chamada quando alguém der um "grito" no sistema
+    const handleModuleAction = (event: Event) => {
+      // Fazemos um cast (conversão) para entender os detalhes do evento
+      const customEvent = event as CustomEvent;
+      const { targetId, action } = customEvent.detail;
+
+      // Se o grito não for pra esse módulo, a gente ignora
+      if (targetId !== moduleData.id) return;
+
+      // Se for pra nós, executamos a ação!
+      if (action === 'play') {
+        setIsPlaying(true);
+        // Se estiver minimizado, ele avisa o pai para abrir!
+        if (moduleData.isMinimized) onUpdate(moduleData.id, { isMinimized: false });
+      }
+      if (action === 'pause') setIsPlaying(false);
+      if (action === 'toggle') setIsPlaying(prev => !prev);
+    };
+
+    // Colocamos o módulo para ouvir a janela
+    window.addEventListener('rpg-module-action', handleModuleAction);
+
+    // Quando o módulo for fechado, ele para de ouvir
+    return () => {
+      window.removeEventListener('rpg-module-action', handleModuleAction);
+    };
+  }, [moduleData.id]); 
+  // O array de dependências tem moduleData.id para garantir que ele ouça o ID correto
+
   // Sincronização de Volume e Play/Pause
   useEffect(() => {
     if (audioRef.current) {
@@ -67,7 +98,7 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
   if (!moduleData.isActive) return null;
 
   return (
-    <div className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
+    <div id={`module-${moduleData.id}`} className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
       
       {/* CABEÇALHO (Sempre Visível) */}
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">

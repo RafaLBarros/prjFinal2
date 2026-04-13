@@ -83,6 +83,35 @@ ipcMain.handle('fs:importAsset', async () => {
   }
 })
 
+// NOVO OUVINTE: IMPORTAR PDF
+ipcMain.handle('fs:importPdf', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Importar Livro/PDF',
+    properties: ['openFile'],
+    // O filtro mudou para PDF!
+    filters: [{ name: 'Arquivos PDF', extensions: ['pdf'] }] 
+  })
+
+  if (canceled || filePaths.length === 0) return { success: false }
+
+  const sourcePath = filePaths[0]
+  const fileName = basename(sourcePath)
+  const userDataPath = app.getPath('userData')
+  
+  // Vamos salvar os PDFs na mesma pasta "assets" do cofre
+  const assetsVaultPath = join(userDataPath, 'assets')
+  await fs.mkdir(assetsVaultPath, { recursive: true }).catch(() => {})
+  
+  const destPath = join(assetsVaultPath, fileName)
+
+  try {
+    await fs.copyFile(sourcePath, destPath)
+    return { success: true, fileName: fileName }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+})
+
 
 // --- FIM DA NOSSA API DE ARQUIVOS ---
 

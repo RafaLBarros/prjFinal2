@@ -1,6 +1,6 @@
 // src/renderer/src/components/DiceRollerModule.tsx
 import { DiceRollerModule as DiceModuleType, RpgModule, DicePreset } from '../types/rpg';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Props {
   moduleData: DiceModuleType;
@@ -29,6 +29,65 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
 
   const diceFaces = [4, 6, 8, 10, 12, 20, 100];
   const presets: DicePreset[] = moduleData.data.presets || [];
+
+  // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
+  
+  useEffect(() => {
+    const handleModuleAction = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { targetId, action, payload } = customEvent.detail;
+
+      if (targetId !== moduleData.id) return;
+
+      if (action === 'rollPreset' && payload?.presetId) {
+        const targetPreset = presets.find(p => p.id === payload.presetId);
+        
+        if (targetPreset) {
+          // 1. Carrega os dados do preset na mesa visualmente
+          setDiceCounts(targetPreset.dice);
+          setModifier(targetPreset.modifier);
+          
+          // 2. Avisa o Pai para expandir o módulo caso esteja minimizado
+          if (moduleData.isMinimized) {
+            onUpdate(moduleData.id, { isMinimized: false });
+          }
+
+          // 3. (MÁGICA EXTRA) - Simula o clique no botão de rolar usando os dados do preset!
+          // Fazemos um setTimeout rapidinho pra dar tempo do React atualizar a mesa visualmente
+          setTimeout(() => {
+            setIsRolling(true);
+            setRollResult(null); 
+            
+            setTimeout(() => {
+              let grandTotal = 0;
+              const details: { face: number; rolls: number[] }[] = [];
+        
+              diceFaces.forEach(face => {
+                const count = targetPreset.dice[face];
+                if (count > 0) {
+                  const rolls: number[] = [];
+                  for (let i = 0; i < count; i++) {
+                    const roll = Math.floor(Math.random() * face) + 1;
+                    rolls.push(roll);
+                    grandTotal += roll;
+                  }
+                  details.push({ face, rolls });
+                }
+              });
+        
+              grandTotal += targetPreset.modifier;
+              setRollResult({ total: grandTotal, modifier: targetPreset.modifier, details });
+              setIsRolling(false); 
+            }, 600); // O tempo da animação dos dados
+          }, 100); 
+        }
+      }
+    };
+
+    window.addEventListener('rpg-module-action', handleModuleAction);
+    return () => window.removeEventListener('rpg-module-action', handleModuleAction);
+  }, [moduleData.id, moduleData.isMinimized, presets, onUpdate]); 
+  // 👆 FIM DO BLOCO ADICIONADO 👆
 
   // --- FUNÇÕES DA MESA ---
   const handleAddDie = (face: number) => {
@@ -114,7 +173,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
   if (!moduleData.isActive) return null;
 
   return (
-    <div className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-indigo-500 focus-within:shadow-indigo-900/20">
+    <div id={`module-${moduleData.id}`}className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-indigo-500 focus-within:shadow-indigo-900/20">
       
       {/* ANIMAÇÃO */}
       <style>{`

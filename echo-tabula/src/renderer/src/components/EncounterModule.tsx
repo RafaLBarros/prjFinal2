@@ -1,6 +1,6 @@
 // src/renderer/src/components/EncounterModule.tsx
 import { EncounterModule as EncounterModuleType, RpgModule, Combatant, CombatantEffect } from '../types/rpg';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Props {
   moduleData: EncounterModuleType;
@@ -22,6 +22,30 @@ export function EncounterModule({ moduleData, onUpdate }: Props) {
   const [turnAlerts, setTurnAlerts] = useState<{ name: string; alerts: string[] } | null>(null);
 
   const combatants: Combatant[] = moduleData.data.combatants || [];
+
+  // 👇 ADICIONE ESTE BLOCO AQUI 👇
+  // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
+
+  useEffect(() => {
+    const handleModuleAction = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { targetId, action } = customEvent.detail;
+
+      // Se o grito não for pra esse módulo, ignora
+      if (targetId !== moduleData.id) return;
+
+      // Se a ação for "abrir combate", nós expandimos o módulo
+      if (action === 'openEncounter') {
+        if (moduleData.isMinimized) {
+          onUpdate(moduleData.id, { isMinimized: false });
+        }
+      }
+    };
+
+    window.addEventListener('rpg-module-action', handleModuleAction);
+    return () => window.removeEventListener('rpg-module-action', handleModuleAction);
+  }, [moduleData.id, moduleData.isMinimized, onUpdate]);
+  // 👆 FIM DO BLOCO 👆
 
   const handleAddCombatant = () => {
     if (!newName.trim() || !newInitiative.trim()) return;
@@ -164,7 +188,7 @@ export function EncounterModule({ moduleData, onUpdate }: Props) {
   if (!moduleData.isActive) return null;
 
   return (
-    <div className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
+    <div id={`module-${moduleData.id}`} className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
       
       {/* CABEÇALHO */}
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
