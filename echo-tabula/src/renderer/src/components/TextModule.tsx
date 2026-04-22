@@ -49,8 +49,8 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
     if (window.api && window.api.importImage) {
       const result = await window.api.importImage();
       if (result.success && result.fileName) {
-        // Insere a imagem no texto usando o nosso protocolo mágico!
-        editor.chain().focus().setImage({ src: `rpg://${result.fileName}` }).run();
+        // Insere a imagem no texto usando o nosso protocolo mágico! (com o bypass as any)
+        (editor.chain().focus() as any).setImage({ src: `rpg://${result.fileName}` }).run();
         return;
       }
     }
@@ -58,7 +58,7 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
     // Fallback: Se o Mestre quiser colar um link direto da internet
     const url = window.prompt('URL da imagem (Cole um link http...):');
     if (url) {
-      editor.chain().focus().setImage({ src: url }).run();
+      (editor.chain().focus() as any).setImage({ src: url }).run();
     }
   };
 
