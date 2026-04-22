@@ -112,6 +112,33 @@ ipcMain.handle('fs:importPdf', async () => {
   }
 })
 
+// OUVINTE: IMPORTAR IMAGEM (para futuras cenas ou fichas de personagem)
+ipcMain.handle('fs:importImage', async () => {
+  const { canceled, filePaths } = await dialog.showOpenDialog({
+    title: 'Importar Imagem',
+    properties: ['openFile'],
+    filters: [{ name: 'Imagens', extensions: ['jpg', 'jpeg', 'png', 'gif', 'webp'] }] 
+  })
+
+  if (canceled || filePaths.length === 0) return { success: false }
+
+  const sourcePath = filePaths[0]
+  const fileName = basename(sourcePath)
+  const userDataPath = app.getPath('userData')
+  
+  const assetsVaultPath = join(userDataPath, 'assets')
+  await fs.mkdir(assetsVaultPath, { recursive: true }).catch(() => {})
+  
+  const destPath = join(assetsVaultPath, fileName)
+
+  try {
+    await fs.copyFile(sourcePath, destPath)
+    return { success: true, fileName: fileName }
+  } catch (error: any) {
+    return { success: false, error: error.message }
+  }
+})
+
 
 // --- FIM DA NOSSA API DE ARQUIVOS ---
 

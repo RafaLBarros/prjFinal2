@@ -9,6 +9,8 @@ const api = {
   saveFile: (path: string, content: string) => ipcRenderer.invoke('fs:saveFile', { path, content }),
   importAsset: () => ipcRenderer.invoke('fs:importAsset'),
   importPdf: () => ipcRenderer.invoke('fs:importPdf'),
+  importImage: () => ipcRenderer.invoke('fs:importImage'),
+  
   // NOVAS FUNÇÕES DO COFRE DE CAMPANHAS:
   listCampaigns: () => ipcRenderer.invoke('fs:listCampaigns'),
   saveCampaign: (fileName: string, content: string) => ipcRenderer.invoke('fs:saveCampaign', { fileName, content }),

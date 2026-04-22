@@ -10,6 +10,7 @@ declare global {
       saveFile: (path: string, content: string) => Promise<{ success: boolean; error?: string }>
       importAsset: () => Promise<{ success: boolean; fileName?: string; error?: string }>
       importPdf: () => Promise<{ success: boolean; fileName?: string; error?: string }>;
+      importImage: () => Promise<{ success: boolean; fileName?: string; error?: string }>;
 
       // --- NOVAS FUNÇÕES (Cofre de Campanhas) ---
       listCampaigns: () => Promise<{ success: boolean; files: string[]; error?: string }>;

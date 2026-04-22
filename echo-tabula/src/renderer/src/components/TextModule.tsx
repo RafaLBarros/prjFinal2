@@ -4,18 +4,17 @@ import { TextModule as TextModuleType, RpgModule } from '../types/rpg';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+// 👇 NOVO: Importação da extensão de Imagem
+import ImageResize from 'tiptap-extension-resize-image';
 import { ActionLink } from './ActionLink';
 
 // --- SUBCOMPONENTE: A BARRA DE FERRAMENTAS ---
 const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | null, allModules: RpgModule[], currentModuleId: string }) => {
   const [, forceUpdate] = useState({});
   
-  // Estados para o nosso Pop-up de Link
   const [showLinkMenu, setShowLinkMenu] = useState(false);
   const [linkTargetId, setLinkTargetId] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
-  
-  // NOVO: Guarda a informação extra (qual marca-página o cara escolheu)
   const [linkPayload, setLinkPayload] = useState<{ bookmarkId?: string, presetId?: string } | null>(null);
   const [linkAction, setLinkAction] = useState('toggle');
 
@@ -44,8 +43,26 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
     </button>
   );
 
+  // 👇 NOVO: Função para lidar com a importação de imagens
+  const handleAddImage = async () => {
+    // Tenta importar pelo cofre do Electron
+    if (window.api && window.api.importImage) {
+      const result = await window.api.importImage();
+      if (result.success && result.fileName) {
+        // Insere a imagem no texto usando o nosso protocolo mágico!
+        editor.chain().focus().setImage({ src: `rpg://${result.fileName}` }).run();
+        return;
+      }
+    }
+    
+    // Fallback: Se o Mestre quiser colar um link direto da internet
+    const url = window.prompt('URL da imagem (Cole um link http...):');
+    if (url) {
+      editor.chain().focus().setImage({ src: url }).run();
+    }
+  };
+
   const availableModules = allModules.filter(m => m.id !== currentModuleId);
-  // NOVO: Descobre qual módulo o usuário selecionou na primeira lista
   const selectedModule = availableModules.find(m => m.id === linkTargetId);
 
   return (
@@ -60,6 +77,10 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
       <MenuButton onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')} title="Lista Tópicos (-)" icon="• Lista" />
       <MenuButton onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive('orderedList')} title="Lista Numerada (1.)" icon="1. Lista" />
       <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> 
+      
+      {/* 👇 NOVO: Botão de Imagem */}
+      <MenuButton onClick={handleAddImage} isActive={editor.isActive('image')} title="Inserir Imagem" icon="🖼️" />
+      <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> 
 
       <div className="relative">
         <MenuButton 
@@ -71,7 +92,7 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
 
         {showLinkMenu && (
           <div className="absolute top-full mt-2 left-0 w-72 bg-slate-800 border border-slate-600 shadow-xl rounded-md p-4 z-50 flex flex-col gap-3">
-            
+            {/* O restante do seu menu suspenso de links continua exatamente igual aqui... */}
             {/* 1. SELEÇÃO DO MÓDULO */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Módulo Alvo:</label>
@@ -79,7 +100,7 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                 value={linkTargetId} 
                 onChange={(e) => {
                   setLinkTargetId(e.target.value);
-                  setLinkPayload(null); // Reseta o sub-menu ao trocar de módulo
+                  setLinkPayload(null);
                   setLinkAction('toggle');
                 }}
                 className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500"
@@ -93,7 +114,7 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
               </select>
             </div>
 
-            {/* 2. SUB-MENU CONDICIONAL: SE FOR PDF, PERGUNTA QUAL MARCA PÁGINA */}
+            {/* 2. SUB-MENU CONDICIONAL: PDF */}
             {selectedModule?.type === 'pdf_crop' && (
               <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-red-500">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marca-Página:</label>
@@ -113,7 +134,7 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
               </div>
             )}
 
-            {/* 2.5 SUB-MENU CONDICIONAL: SE FOR DADOS, PERGUNTA QUAL PRESET */}
+            {/* 2.5 SUB-MENU CONDICIONAL: DADOS */}
             {selectedModule?.type === 'dice_roller' && (
               <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-indigo-500">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ataque/Rolagem:</label>
@@ -173,21 +194,18 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                 onClick={() => {
                   if (!linkTargetId || !linkLabel) return;
                   
-                  // Decide qual é o "comando" dependendo do tipo do módulo
                   let actionCommand = 'toggle';
                   if (selectedModule?.type === 'audio') actionCommand = linkAction;
                   if (selectedModule?.type === 'pdf_crop') actionCommand = 'openBookmark';
                   if (selectedModule?.type === 'dice_roller') actionCommand = 'rollPreset';
                   if (selectedModule?.type === 'encounter') actionCommand = 'openEncounter';
 
-                  // Insere a pílula no texto
                   editor.chain().focus().insertContent({
                     type: 'actionLink',
                     attrs: { 
                       targetId: linkTargetId, 
                       action: actionCommand, 
                       label: linkLabel,
-                      // Transforma o pacote em string para caber no HTML do TipTap
                       payload: linkPayload ? JSON.stringify(linkPayload) : null
                     }
                   }).run();
@@ -197,10 +215,9 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                   setLinkTargetId('');
                   setLinkPayload(null);
                 }}
-                // Trava o botão se o cara selecionou um PDF mas não escolheu o marca página
                 disabled={!linkTargetId || !linkLabel || 
                   (selectedModule?.type === 'pdf_crop' && !linkPayload?.bookmarkId) ||
-                  (selectedModule?.type === 'dice_roller' && !linkPayload?.presetId) // <-- NOVO!
+                  (selectedModule?.type === 'dice_roller' && !linkPayload?.presetId)
                 }
                 className="flex-1 px-2 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded text-sm transition disabled:opacity-50 disabled:cursor-not-allowed font-medium shadow-lg shadow-emerald-900/20"
               >
@@ -217,7 +234,7 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
 // --- COMPONENTE PRINCIPAL ---
 interface Props {
   moduleData: TextModuleType;
-  allModules?: RpgModule[]; // 👈 Recebemos a lista total aqui! (Opcional por segurança)
+  allModules?: RpgModule[]; 
   onUpdate: (id: string, updatedFields: Partial<RpgModule>) => void;
 }
 
@@ -229,7 +246,15 @@ export function TextModule({ moduleData, allModules = [], onUpdate }: Props) {
         placeholder: 'Comece a digitar os segredos da campanha...',
         emptyEditorClass: 'is-editor-empty',
       }),
-      ActionLink, // Nossa extensão mágica!
+      ActionLink,
+      // 👇 A NOVA EXTENSÃO DE IMAGEM REDIMENSIONÁVEL
+      ImageResize.configure({
+        inline: false,
+        allowBase64: true, 
+        HTMLAttributes: {
+          class: 'rounded-md border border-slate-700 shadow-md my-4 max-w-full transition-shadow',
+        },
+      } as any), // 👈 O "bypass" do TypeScript (as any) entra aqui!
     ],
     content: moduleData.data.content,
     onUpdate: ({ editor }) => {
@@ -256,6 +281,17 @@ export function TextModule({ moduleData, allModules = [], onUpdate }: Props) {
           color: #475569;
           pointer-events: none;
           height: 0;
+        }
+        /* 👇 O visual da imagem selecionada e das alças de redimensionamento */
+        .tiptap img.ProseMirror-selectednode {
+          outline: 2px solid #10b981; /* Borda esmeralda ao clicar */
+        }
+        .image-resizer {
+          border: 1px solid #10b981 !important; 
+        }
+        .image-resizer__handler {
+          background-color: #10b981 !important; /* Os quadradinhos nos cantos */
+          border: 1px solid #064e3b !important;
         }
       `}</style>
 
@@ -284,7 +320,6 @@ export function TextModule({ moduleData, allModules = [], onUpdate }: Props) {
       {/* CORPO DO MÓDULO */}
       {!moduleData.isMinimized && (
         <>
-          {/* Passamos o allModules para a MenuBar */}
           <MenuBar editor={editor} allModules={allModules} currentModuleId={moduleData.id} />
           
           <div className="p-5">
