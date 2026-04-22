@@ -106,11 +106,21 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                 className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500"
               >
                 <option value="" disabled>Selecione um módulo...</option>
-                {availableModules.map(mod => (
-                  <option key={mod.id} value={mod.id}>
-                    {mod.type === 'audio' ? '🎵' : mod.type === 'pdf_crop' ? '📕' : mod.type === 'dice_roller' ? '🎲' : '⚔️'} {mod.name}
-                  </option>
-                ))}
+                {availableModules.map(mod => {
+                  // Define o ícone com base no tipo
+                  let icon = '📦';
+                  if (mod.type === 'audio') icon = '🎵';
+                  else if (mod.type === 'pdf_crop') icon = '📕';
+                  else if (mod.type === 'dice_roller') icon = '🎲';
+                  else if (mod.type === 'encounter') icon = '⚔️';
+                  else if (mod.type === 'text') icon = '📝'; // Nosso novo link de texto!
+                  
+                  return (
+                    <option key={mod.id} value={mod.id}>
+                      {icon} {mod.name}
+                    </option>
+                  );
+                })}
               </select>
             </div>
 
@@ -199,6 +209,7 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                   if (selectedModule?.type === 'pdf_crop') actionCommand = 'openBookmark';
                   if (selectedModule?.type === 'dice_roller') actionCommand = 'rollPreset';
                   if (selectedModule?.type === 'encounter') actionCommand = 'openEncounter';
+                  if (selectedModule?.type === 'text') actionCommand = 'focusModule';
 
                   editor.chain().focus().insertContent({
                     type: 'actionLink',
