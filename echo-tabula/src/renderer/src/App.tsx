@@ -27,6 +27,9 @@ export default function App() {
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
   const [editingCampaignName, setEditingCampaignName] = useState('');
 
+  // Estado de Importação e Exportação
+  const [isProcessingIO, setIsProcessingIO] = useState(false);
+
   // --- O DESPERTADOR (AUTO-LOAD NO INÍCIO) ---
   useEffect(() => {
     const loadLastCampaign = async () => {
@@ -420,6 +423,36 @@ export default function App() {
     setTree(updateModulesInTree(tree));
   };
 
+  // --- FUNÇÕES DE EXPORTAÇÃO E IMPORTAÇÃO ---
+  const handleExportCampaign = async () => {
+    if (!currentFile) return;
+    
+    setIsProcessingIO(true);
+    // Mandamos para o backend o nome do arquivo JSON e a árvore atual para ele caçar os assets
+    const result = await window.api.exportCampaign(currentFile, tree); 
+    setIsProcessingIO(false);
+    
+    if (result.success) {
+      setSaveStatus('saved'); // Dá um feedback visual rápido
+    } else if (result.error !== 'Cancelado pelo usuário') {
+      alert(`Erro ao exportar: ${result.error}`);
+    }
+  };
+
+  const handleImportCampaign = async () => {
+    setIsProcessingIO(true);
+    const result = await window.api.importCampaign();
+    setIsProcessingIO(false);
+    
+    if (result.success && result.fileName) {
+      // Se importou com sucesso, já carregamos a campanha na tela para o mestre ver!
+      executeLoad(result.fileName);
+    } else if (result.error !== 'Cancelado pelo usuário') {
+      alert(`Erro ao importar: ${result.error}`);
+    }
+  };
+
+
   return (
     <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans">
       
@@ -429,11 +462,19 @@ export default function App() {
           <div className="flex justify-between items-center">
             <h1 className="font-bold text-emerald-500 tracking-wider text-sm uppercase">Echo Tabula</h1>
             
-            <div className="flex gap-3 items-center">
+            <div className="flex gap-2 items-center">
               {saveStatus === 'saving' && <span className="text-[10px] text-emerald-400 animate-pulse font-medium">Salvando...</span>}
               {saveStatus === 'saved' && <span className="text-[10px] text-slate-500 font-medium">Salvo</span>}
+              {isProcessingIO && <span className="text-[10px] text-blue-400 animate-pulse font-medium">Processando...</span>}
               
-              <button onClick={handleOpenLoadClick} className="text-slate-400 hover:text-blue-400 transition-colors" title="Abrir Campanha (Load)">
+              {/* O NOVO BOTÃO DE IMPORTAR */}
+              <button onClick={handleImportCampaign} disabled={isProcessingIO} className="text-slate-400 hover:text-blue-400 transition-colors text-lg disabled:opacity-50" title="Importar Pacote (.tabula)">
+                📥
+              </button>
+
+              <div className="w-px h-4 bg-slate-700 mx-1"></div>
+
+              <button onClick={handleOpenLoadClick} className="text-slate-400 hover:text-blue-400 transition-colors" title="Abrir Campanha">
                 📂
               </button>
               <button onClick={handleNewCampaignClick} className="text-slate-400 hover:text-emerald-400 transition-colors text-lg" title="Nova Campanha">
@@ -466,6 +507,17 @@ export default function App() {
               <button onClick={() => handleAddNode(null, 'scene')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-1.5 rounded transition border border-slate-700 font-medium">
                 + Cena
               </button>
+
+              {/* 👇 O NOVO BOTÃO DE EXPORTAR 👇 */}
+              <button 
+                onClick={handleExportCampaign} 
+                disabled={isProcessingIO}
+                className="bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white px-3 py-1.5 rounded transition border border-indigo-500/50 text-xs font-bold disabled:opacity-50"
+                title="Exportar Campanha para Backup"
+              >
+                📤 Exportar
+              </button>
+              
             </div>
           )}
         </div>

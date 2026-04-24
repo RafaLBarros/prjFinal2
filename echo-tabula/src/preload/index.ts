@@ -16,7 +16,11 @@ const api = {
   saveCampaign: (fileName: string, content: string) => ipcRenderer.invoke('fs:saveCampaign', { fileName, content }),
   loadCampaign: (fileName: string) => ipcRenderer.invoke('fs:loadCampaign', fileName),
   deleteCampaign: (fileName: string) => ipcRenderer.invoke('fs:deleteCampaign', fileName),
-  renameCampaign: (oldName: string, newName: string) => ipcRenderer.invoke('fs:renameCampaign', { oldName, newName })
+  renameCampaign: (oldName: string, newName: string) => ipcRenderer.invoke('fs:renameCampaign', { oldName, newName }),
+
+  //FUNÇÕES DE EXPORTAÇÃO E IMPORTAÇÃO DE CAMPANHA:
+  exportCampaign: (fileName: string, tree: any) => ipcRenderer.invoke('fs:exportCampaign', fileName, tree),
+  importCampaign: () => ipcRenderer.invoke('fs:importCampaign'),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

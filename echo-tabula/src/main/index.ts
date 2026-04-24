@@ -1,3 +1,4 @@
+// src/main/index.ts
 import { app, shell, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
 import { join, basename } from 'path'
 import { pathToFileURL } from 'url'
@@ -6,6 +7,8 @@ import { autoUpdater } from 'electron-updater'
 import log from "electron-log/main"
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs/promises'
+import path from 'path';
+import AdmZip from 'adm-zip';
 
 // 1. ELEVAÇÃO DE PRIVILÉGIOS (Apenas o protocolo local do cofre)
 protocol.registerSchemesAsPrivileged([
@@ -64,7 +67,7 @@ ipcMain.handle('fs:importAsset', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Importar Mídia para a Campanha',
     properties: ['openFile'],
-    filters: [{ name: 'Arquivos de Áudio', extensions: ['mp3', 'wav', 'ogg'] }] // Focado em áudio agora!
+    filters: [{ name: 'Arquivos de Áudio', extensions: ['mp3', 'wav', 'ogg'] }]
   })
 
   if (canceled || filePaths.length === 0) return { success: false }
@@ -88,7 +91,6 @@ ipcMain.handle('fs:importPdf', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Importar Livro/PDF',
     properties: ['openFile'],
-    // O filtro mudou para PDF!
     filters: [{ name: 'Arquivos PDF', extensions: ['pdf'] }] 
   })
 
@@ -98,7 +100,6 @@ ipcMain.handle('fs:importPdf', async () => {
   const fileName = basename(sourcePath)
   const userDataPath = app.getPath('userData')
   
-  // Vamos salvar os PDFs na mesma pasta "assets" do cofre
   const assetsVaultPath = join(userDataPath, 'assets')
   await fs.mkdir(assetsVaultPath, { recursive: true }).catch(() => {})
   
@@ -112,7 +113,7 @@ ipcMain.handle('fs:importPdf', async () => {
   }
 })
 
-// OUVINTE: IMPORTAR IMAGEM (para futuras cenas ou fichas de personagem)
+// OUVINTE: IMPORTAR IMAGEM
 ipcMain.handle('fs:importImage', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Importar Imagem',
@@ -138,7 +139,6 @@ ipcMain.handle('fs:importImage', async () => {
     return { success: false, error: error.message }
   }
 })
-
 
 // --- FIM DA NOSSA API DE ARQUIVOS ---
 
@@ -242,18 +242,14 @@ app.whenReady().then(async () => {
     }
   })
 
-  // NOVO OUVINTE: ESCOLHER ARQUIVO DIRETAMENTE DO COFRE
   ipcMain.handle('fs:selectFromVault', async () => {
     const assetsVaultPath = join(app.getPath('userData'), 'assets')
-    
-    // Garante que a pasta existe
     await fs.mkdir(assetsVaultPath, { recursive: true }).catch(() => {})
 
     const { canceled, filePaths } = await dialog.showOpenDialog({
-      title: 'Escolher Áudio do Cofre',
-      defaultPath: assetsVaultPath, // O explorador já abre direto dentro do Cofre!
-      properties: ['openFile'],
-      filters: [{ name: 'Arquivos de Áudio', extensions: ['mp3', 'wav', 'ogg'] }]
+      title: 'Escolher Arquivo do Cofre',
+      defaultPath: assetsVaultPath, 
+      properties: ['openFile']
     })
 
     if (canceled || filePaths.length === 0) return { success: false }
@@ -262,8 +258,6 @@ app.whenReady().then(async () => {
     const fileName = basename(sourcePath)
     const destPath = join(assetsVaultPath, fileName)
 
-    // Tratamento à prova de balas: se o usuário navegou pra fora do cofre sem querer 
-    // e escolheu um arquivo de outra pasta, nós importamos ele automaticamente.
     if (sourcePath !== destPath) {
       try {
         await fs.copyFile(sourcePath, destPath)
@@ -271,26 +265,166 @@ app.whenReady().then(async () => {
         console.error("Erro ao copiar arquivo errante para o cofre:", error)
       }
     }
-
-    // Devolve só o nome do arquivo para o React montar o rpg://
     return { success: true, fileName: fileName }
   })
 
-  // --- MOTOR DE REDE: ARQUIVOS LOCAIS (rpg://) ---
+  // =========================================================================
+  // 👇 A EXPORTAÇÃO (COM O DEEP SCANNER CORRIGIDO) 👇
+  // =========================================================================
+
+  ipcMain.handle('fs:exportCampaign', async (_, fileName: string, tree: any[]) => {
+    try {
+      const { canceled, filePath } = await dialog.showSaveDialog({
+        title: 'Exportar Campanha',
+        defaultPath: fileName.replace('.json', '.tabula'),
+        filters: [{ name: 'Echo Tabula Backup', extensions: ['tabula'] }]
+      })
+  
+      if (canceled || !filePath) return { success: false, error: 'Cancelado pelo usuário' }
+  
+      const zip = new AdmZip()
+      const jsonContent = JSON.stringify(tree, null, 2)
+      zip.addFile(fileName, Buffer.from(jsonContent, 'utf8'))
+  
+      const assetsToExport = new Set<string>()
+      
+      const findAssetsDeep = (obj: any) => {
+        if (typeof obj === 'string') {
+          // Captura links rpg:// perdidos no meio de anotações e descrições
+          const matches = obj.match(/rpg:\/\/([^"'\s]+)/g)
+          if (matches) {
+            matches.forEach((m: string) => {
+              let rawName = m.replace(/^rpg:\/\//i, '');
+              rawName = rawName.replace(/\/+$/, ''); // Remove a barra do final
+              assetsToExport.add(decodeURIComponent(rawName));
+            })
+          }
+        } else if (Array.isArray(obj)) {
+          obj.forEach(findAssetsDeep)
+        } else if (obj !== null && typeof obj === 'object') {
+          // 👇 A MÁGICA: Olha direto nas chaves, ignorando se tem rpg:// ou não!
+          const keysToCheck = ['filePath', 'urlOrPath', 'url'];
+          for (const key of keysToCheck) {
+            if (typeof obj[key] === 'string' && obj[key].length > 0) {
+              const val = obj[key];
+              if (!val.startsWith('http')) {
+                // Remove rpg:// se existir, remove barras residuais e decodifica.
+                let rawName = val.replace(/^rpg:\/\//i, '');
+                rawName = rawName.replace(/\/+$/, '');
+                assetsToExport.add(decodeURIComponent(rawName));
+              }
+            }
+          }
+          // Desce mais um nível na árvore
+          Object.values(obj).forEach(findAssetsDeep)
+        }
+      }
+      
+      findAssetsDeep(tree)
+  
+      const userDataPath = app.getPath('userData')
+      const vaultPath = join(userDataPath, 'assets')
+  
+      for (const assetName of assetsToExport) {
+        const decodedPath = join(vaultPath, assetName)
+        
+        try {
+          const fileBuffer = await fs.readFile(decodedPath)
+          zip.addFile(`assets/${assetName}`, fileBuffer)
+        } catch (e) {
+          console.warn(`[Exportação] Mídia não encontrada no disco e não foi incluída: ${decodedPath}`)
+        }
+      }
+  
+      zip.writeZip(filePath)
+      return { success: true }
+  
+    } catch (error: any) {
+      console.error("Erro ao exportar:", error)
+      return { success: false, error: error.message }
+    }
+  })
+  
+  ipcMain.handle('fs:importCampaign', async () => {
+    try {
+      const { canceled, filePaths } = await dialog.showOpenDialog({
+        title: 'Importar Campanha',
+        properties: ['openFile'],
+        filters: [{ name: 'Echo Tabula Backup', extensions: ['tabula', 'zip'] }]
+      })
+  
+      if (canceled || filePaths.length === 0) return { success: false, error: 'Cancelado pelo usuário' }
+  
+      const zipPath = filePaths[0]
+      const zip = new AdmZip(zipPath)
+      const zipEntries = zip.getEntries()
+  
+      let jsonFileName = ''
+      const campaignsPath = join(app.getPath('userData'), 'campaigns')
+      const vaultPath = join(app.getPath('userData'), 'assets')
+  
+      await fs.mkdir(campaignsPath, { recursive: true }).catch(() => {})
+      await fs.mkdir(vaultPath, { recursive: true }).catch(() => {})
+  
+      for (const zipEntry of zipEntries) {
+        if (!zipEntry.isDirectory) {
+          if (zipEntry.entryName.endsWith('.json') && !zipEntry.entryName.includes('/')) {
+            jsonFileName = basename(zipEntry.entryName) 
+            const jsonContent = zipEntry.getData().toString('utf8')
+            await fs.writeFile(join(campaignsPath, jsonFileName), jsonContent, 'utf-8')
+          } else if (zipEntry.entryName.startsWith('assets/')) {
+            const mediaName = basename(zipEntry.entryName)
+            const mediaContent = zipEntry.getData()
+            await fs.writeFile(join(vaultPath, mediaName), mediaContent)
+          }
+        }
+      }
+  
+      if (!jsonFileName) throw new Error("Arquivo de campanha (.json) não encontrado no pacote.")
+  
+      return { success: true, fileName: jsonFileName }
+  
+    } catch (error: any) {
+      console.error("Erro ao importar:", error)
+      return { success: false, error: error.message }
+    }
+  })
+
+  // =========================================================================
+  // 👇 A BLINDAGEM DO PROTOCOLO (O 404 DO REACT-PDF) 👇
+  // =========================================================================
+
   const userDataPath = app.getPath('userData')
   const assetsVaultPath = join(userDataPath, 'assets')
   await fs.mkdir(assetsVaultPath, { recursive: true }).catch(() => {})
 
-  protocol.handle('rpg', (request) => {
-    let rawString = request.url.replace('rpg://', '')
-    if (rawString.endsWith('/')) rawString = rawString.slice(0, -1)
-    const fileName = decodeURIComponent(rawString)
-    const absolutePath = join(assetsVaultPath, fileName)
-    const fileUrl = pathToFileURL(absolutePath).toString()
-    return net.fetch(fileUrl)
-  })
+  protocol.handle('rpg', async (request) => {
+    try {
+      // Limpa os parâmetros estranhos do final da URL
+      const rawUrl = request.url.replace(/^rpg:\/\//i, '');
+      const cleanPath = rawUrl.split('?')[0].split('#')[0];
+      const finalString = cleanPath.replace(/^\/+|\/+$/g, '');
+      
+      const fileName = decodeURIComponent(finalString);
+      const absolutePath = join(assetsVaultPath, fileName);
 
-   app.on('browser-window-created', (_, window) => {
+      try {
+        await fs.stat(absolutePath);
+      } catch (err) {
+        console.error(`[Protocolo RPG] Arquivo não encontrado: ${absolutePath}`);
+        return new Response('File not found', { status: 404 });
+      }
+
+      const fileUrl = pathToFileURL(absolutePath).toString();
+      return net.fetch(fileUrl);
+      
+    } catch (error) {
+      console.error(`[Protocolo RPG] Erro fatal na URL ${request.url}:`, error);
+      return new Response('Internal Error', { status: 500 });
+    }
+  });
+
+  app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
 
