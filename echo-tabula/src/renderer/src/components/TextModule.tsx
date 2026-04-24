@@ -1,19 +1,27 @@
 // src/renderer/src/components/TextModule.tsx
 import { useState, useEffect } from 'react';
-import { TextModule as TextModuleType, RpgModule } from '../types/rpg';
+import { TextModule as TextModuleType, RpgModule, CampaignNode } from '../types/rpg';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
-// 👇 NOVO: Importação da extensão de Imagem
 import ImageResize from 'tiptap-extension-resize-image';
 import { ActionLink } from './ActionLink';
 
+interface MenuBarProps {
+  editor: Editor | null;
+  allModules: RpgModule[];
+  currentModuleId: string;
+  campaignNodes: CampaignNode[];
+  currentSceneId: string;
+}
+
 // --- SUBCOMPONENTE: A BARRA DE FERRAMENTAS ---
-const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | null, allModules: RpgModule[], currentModuleId: string }) => {
+const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSceneId }: MenuBarProps) => {
   const [, forceUpdate] = useState({});
   
   const [showLinkMenu, setShowLinkMenu] = useState(false);
-  const [linkTargetId, setLinkTargetId] = useState('');
+  const [selectedSceneId, setSelectedSceneId] = useState<string>(currentSceneId); // Cena Alvo
+  const [linkTargetId, setLinkTargetId] = useState(''); // Módulo Alvo
   const [linkLabel, setLinkLabel] = useState('');
   const [linkPayload, setLinkPayload] = useState<{ bookmarkId?: string, presetId?: string } | null>(null);
   const [linkAction, setLinkAction] = useState('toggle');
@@ -26,6 +34,11 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
       editor.off('transaction', handleTransaction);
     };
   }, [editor]);
+
+  // Se o menu for aberto, reseta a cena alvo para a atual
+  useEffect(() => {
+    if (showLinkMenu) setSelectedSceneId(currentSceneId);
+  }, [showLinkMenu, currentSceneId]);
 
   if (!editor) return null;
 
@@ -43,26 +56,48 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
     </button>
   );
 
-  // 👇 NOVO: Função para lidar com a importação de imagens
   const handleAddImage = async () => {
-    // Tenta importar pelo cofre do Electron
     if (window.api && window.api.importImage) {
       const result = await window.api.importImage();
       if (result.success && result.fileName) {
-        // Insere a imagem no texto usando o nosso protocolo mágico! (com o bypass as any)
         (editor.chain().focus() as any).setImage({ src: `rpg://${result.fileName}` }).run();
         return;
       }
     }
-    
-    // Fallback: Se o Mestre quiser colar um link direto da internet
     const url = window.prompt('URL da imagem (Cole um link http...):');
     if (url) {
       (editor.chain().focus() as any).setImage({ src: url }).run();
     }
   };
 
-  const availableModules = allModules.filter(m => m.id !== currentModuleId);
+  // 👇 NOVA LÓGICA DE BUSCA HIERÁRQUICA (Cenas -> Módulos) 👇
+  
+  // 1. Vasculha a árvore inteira e extrai todas as Cenas e seus caminhos de pasta
+  const getScenes = (nodes: CampaignNode[], path = ''): any[] => {
+    let scenes: any[] = [];
+    nodes.forEach(node => {
+      const newPath = path ? `${path} / ${node.name}` : node.name;
+      if (node.type === 'scene') {
+        scenes.push({ id: node.id, name: node.name, path: newPath, modules: node.modules || [] });
+      }
+      if (node.children) scenes = [...scenes, ...getScenes(node.children, newPath)];
+    });
+    return scenes;
+  };
+  
+  const allScenes = getScenes(campaignNodes);
+  const activeTargetScene = allScenes.find(s => s.id === selectedSceneId);
+  
+  // 2. Filtra os módulos com base na cena escolhida
+  let availableModules: RpgModule[] = [];
+  if (selectedSceneId === currentSceneId) {
+    // Se for a cena atual, usamos os módulos fresquinhos e excluímos nós mesmos
+    availableModules = allModules.filter(m => m.id !== currentModuleId);
+  } else if (activeTargetScene) {
+    // Se for outra cena, pegamos da árvore
+    availableModules = activeTargetScene.modules;
+  }
+
   const selectedModule = availableModules.find(m => m.id === linkTargetId);
 
   return (
@@ -77,8 +112,6 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
       <MenuButton onClick={() => editor.chain().focus().toggleBulletList().run()} isActive={editor.isActive('bulletList')} title="Lista Tópicos (-)" icon="• Lista" />
       <MenuButton onClick={() => editor.chain().focus().toggleOrderedList().run()} isActive={editor.isActive('orderedList')} title="Lista Numerada (1.)" icon="1. Lista" />
       <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> 
-      
-      {/* 👇 NOVO: Botão de Imagem */}
       <MenuButton onClick={handleAddImage} isActive={editor.isActive('image')} title="Inserir Imagem" icon="🖼️" />
       <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> 
 
@@ -91,11 +124,36 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
         />
 
         {showLinkMenu && (
-          <div className="absolute top-full mt-2 left-0 w-72 bg-slate-800 border border-slate-600 shadow-xl rounded-md p-4 z-50 flex flex-col gap-3">
-            {/* O restante do seu menu suspenso de links continua exatamente igual aqui... */}
-            {/* 1. SELEÇÃO DO MÓDULO */}
+          <div className="absolute top-full mt-2 left-0 w-80 bg-slate-800 border border-slate-600 shadow-[0_10px_40px_rgba(0,0,0,0.8)] rounded-md p-4 z-50 flex flex-col gap-3">
+            
+            {/* 1. SELEÇÃO DA CENA (Hierarquia Pai) */}
             <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Módulo Alvo:</label>
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <span>📍</span> Cena Alvo:
+              </label>
+              <select 
+                value={selectedSceneId} 
+                onChange={(e) => {
+                  setSelectedSceneId(e.target.value);
+                  setLinkTargetId(''); // Reseta o módulo quando troca de cena
+                  setLinkPayload(null);
+                  setLinkAction('toggle');
+                }}
+                className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500"
+              >
+                {allScenes.map(scene => (
+                  <option key={scene.id} value={scene.id}>
+                    {scene.path} {scene.id === currentSceneId ? '(Atual)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* 2. SELEÇÃO DO MÓDULO (Hierarquia Filho) */}
+            <div className="flex flex-col gap-1">
+              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
+                <span>🧩</span> Módulo Alvo:
+              </label>
               <select 
                 value={linkTargetId} 
                 onChange={(e) => {
@@ -105,15 +163,16 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                 }}
                 className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500"
               >
-                <option value="" disabled>Selecione um módulo...</option>
+                <option value="" disabled>
+                  {availableModules.length > 0 ? "Selecione um módulo..." : "Nenhum módulo nesta cena."}
+                </option>
                 {availableModules.map(mod => {
-                  // Define o ícone com base no tipo
                   let icon = '📦';
                   if (mod.type === 'audio') icon = '🎵';
                   else if (mod.type === 'pdf_crop') icon = '📕';
                   else if (mod.type === 'dice_roller') icon = '🎲';
                   else if (mod.type === 'encounter') icon = '⚔️';
-                  else if (mod.type === 'text') icon = '📝'; // Nosso novo link de texto!
+                  else if (mod.type === 'text') icon = '📝';
                   
                   return (
                     <option key={mod.id} value={mod.id}>
@@ -124,7 +183,7 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
               </select>
             </div>
 
-            {/* 2. SUB-MENU CONDICIONAL: PDF */}
+            {/* SUB-MENU CONDICIONAL: PDF */}
             {selectedModule?.type === 'pdf_crop' && (
               <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-red-500">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marca-Página:</label>
@@ -138,13 +197,10 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                     <option key={b.id} value={b.id}>{b.name} (Pág {b.page})</option>
                   ))}
                 </select>
-                {(!selectedModule.data.bookmarks || selectedModule.data.bookmarks.length === 0) && (
-                  <span className="text-[10px] text-red-400 italic">Este PDF não possui marca-páginas salvos.</span>
-                )}
               </div>
             )}
 
-            {/* 2.5 SUB-MENU CONDICIONAL: DADOS */}
+            {/* SUB-MENU CONDICIONAL: DADOS */}
             {selectedModule?.type === 'dice_roller' && (
               <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-indigo-500">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ataque/Rolagem:</label>
@@ -158,9 +214,6 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                     <option key={p.id} value={p.id}>{p.name}</option>
                   ))}
                 </select>
-                {(!selectedModule.data.presets || selectedModule.data.presets.length === 0) && (
-                  <span className="text-[10px] text-indigo-400 italic">Abra a mesa e salve um preset primeiro.</span>
-                )}
               </div>
             )}
 
@@ -212,13 +265,19 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                   if (selectedModule?.type === 'encounter') actionCommand = 'openEncounter';
                   if (selectedModule?.type === 'text') actionCommand = 'focusModule';
 
+                  // 👇 A MÁGICA: Embutimos a Cena Alvo no pacote! 👇
+                  const finalPayload = { 
+                    ...(linkPayload || {}), 
+                    targetSceneId: selectedSceneId 
+                  };
+
                   editor.chain().focus().insertContent({
                     type: 'actionLink',
                     attrs: { 
                       targetId: linkTargetId, 
                       action: actionCommand, 
                       label: linkLabel,
-                      payload: linkPayload ? JSON.stringify(linkPayload) : null
+                      payload: JSON.stringify(finalPayload)
                     }
                   }).run();
 
@@ -247,98 +306,63 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
 interface Props {
   moduleData: TextModuleType;
   allModules?: RpgModule[]; 
+  campaignNodes?: CampaignNode[]; // 👈 Nova Propriedade
+  currentSceneId?: string;        // 👈 Nova Propriedade
   onUpdate: (id: string, updatedFields: Partial<RpgModule>) => void;
 }
 
-export function TextModule({ moduleData, allModules = [], onUpdate }: Props) {
+export function TextModule({ moduleData, allModules = [], campaignNodes = [], currentSceneId = '', onUpdate }: Props) {
   const editor = useEditor({
     extensions: [
       StarterKit,
-      Placeholder.configure({
-        placeholder: 'Comece a digitar os segredos da campanha...',
-        emptyEditorClass: 'is-editor-empty',
-      }),
+      Placeholder.configure({ placeholder: 'Comece a digitar os segredos da campanha...', emptyEditorClass: 'is-editor-empty' }),
       ActionLink,
-      // 👇 A NOVA EXTENSÃO DE IMAGEM REDIMENSIONÁVEL
       ImageResize.configure({
-        inline: false,
-        allowBase64: true, 
-        HTMLAttributes: {
-          class: 'rounded-md border border-slate-700 shadow-md my-4 max-w-full transition-shadow',
-        },
-      } as any), // 👈 O "bypass" do TypeScript (as any) entra aqui!
+        inline: false, allowBase64: true, 
+        HTMLAttributes: { class: 'rounded-md border border-slate-700 shadow-md my-4 max-w-full transition-shadow' },
+      } as any),
     ],
     content: moduleData.data.content,
-    onUpdate: ({ editor }) => {
-      onUpdate(moduleData.id, { 
-        data: { ...moduleData.data, content: editor.getHTML() } 
-      });
-    },
-    editorProps: {
-      attributes: {
-        class: 'focus:outline-none min-h-[150px]',
-      },
-    },
+    onUpdate: ({ editor }) => onUpdate(moduleData.id, { data: { ...moduleData.data, content: editor.getHTML() } }),
+    editorProps: { attributes: { class: 'focus:outline-none min-h-[150px]' } },
   });
 
   if (!moduleData.isActive) return null;
 
   return (
     <div id={`module-${moduleData.id}`} className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
-      
       <style>{`
-        .tiptap p.is-editor-empty:first-child::before {
-          content: attr(data-placeholder);
-          float: left;
-          color: #475569;
-          pointer-events: none;
-          height: 0;
-        }
-        /* 👇 O visual da imagem selecionada e das alças de redimensionamento */
-        .tiptap img.ProseMirror-selectednode {
-          outline: 2px solid #10b981; /* Borda esmeralda ao clicar */
-        }
-        .image-resizer {
-          border: 1px solid #10b981 !important; 
-        }
-        .image-resizer__handler {
-          background-color: #10b981 !important; /* Os quadradinhos nos cantos */
-          border: 1px solid #064e3b !important;
-        }
+        .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; color: #475569; pointer-events: none; height: 0; }
+        .tiptap img.ProseMirror-selectednode { outline: 2px solid #10b981; }
+        .image-resizer { border: 1px solid #10b981 !important; }
+        .image-resizer__handler { background-color: #10b981 !important; border: 1px solid #064e3b !important; }
       `}</style>
 
-      {/* CABEÇALHO */}
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2 flex-1">
           <span className="text-emerald-400">📝</span>
           <input 
-            type="text"
-            value={moduleData.name}
-            onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })}
+            type="text" value={moduleData.name} onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })}
             className="bg-transparent text-emerald-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-emerald-700"
             placeholder="Título da Nota..."
           />
         </div>
-        
-        <button
-          onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })}
-          className="text-slate-500 hover:text-emerald-400 px-2 py-1 rounded transition text-sm font-bold"
-          title={moduleData.isMinimized ? "Expandir" : "Minimizar"}
-        >
+        <button onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })} className="text-slate-500 hover:text-emerald-400 px-2 py-1 rounded transition text-sm font-bold">
           {moduleData.isMinimized ? '▼' : '▲'}
         </button>
       </div>
 
-      {/* CORPO DO MÓDULO */}
       {!moduleData.isMinimized && (
         <>
-          <MenuBar editor={editor} allModules={allModules} currentModuleId={moduleData.id} />
-          
+          <MenuBar 
+            editor={editor} 
+            allModules={allModules} 
+            currentModuleId={moduleData.id} 
+            campaignNodes={campaignNodes} 
+            currentSceneId={currentSceneId} 
+          />
           <div className="p-5">
-            <EditorContent 
-              editor={editor} 
-              className="prose prose-invert prose-emerald max-w-none prose-h1:text-2xl prose-h2:text-xl prose-p:text-slate-300" 
-            />
+            <EditorContent editor={editor} className="prose prose-invert prose-emerald max-w-none prose-h1:text-2xl prose-h2:text-xl prose-p:text-slate-300" />
           </div>
         </>
       )}

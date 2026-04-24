@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CampaignNode } from './types/rpg';
 import { SceneManager } from './components/SceneManager';
+import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
 
 export default function App() {
   
@@ -12,16 +13,16 @@ export default function App() {
   const [activeSceneId, setActiveSceneId] = useState<string | null>('s1');
 
   // --- NOVOS ESTADOS DO GERENCIADOR DE CAMPANHA ---
-  const [currentFile, setCurrentFile] = useState<string | null>(null); // Lembra o nome do arquivo atual
+  const [currentFile, setCurrentFile] = useState<string | null>(null); 
   const [isLoadOpen, setIsLoadOpen] = useState(false);
   const [isSaveOpen, setIsSaveOpen] = useState(false);
   const [campaignList, setCampaignList] = useState<string[]>([]);
   const [newSaveName, setNewSaveName] = useState('');
 
-  // NOVO: Status visual para o usuário saber que está seguro
+  // Status visual para o usuário saber que está seguro
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  const [saveError, setSaveError] = useState(''); // <-- NOVO ESTADO DE ERRO
+  const [saveError, setSaveError] = useState(''); 
 
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
   const [editingCampaignName, setEditingCampaignName] = useState('');
@@ -29,11 +30,9 @@ export default function App() {
   // --- O DESPERTADOR (AUTO-LOAD NO INÍCIO) ---
   useEffect(() => {
     const loadLastCampaign = async () => {
-      // 1. Pergunta à memória do navegador qual foi a última campanha
       const lastFile = localStorage.getItem('lastCampaign');
       
       if (lastFile) {
-        // 2. Tenta carregar do disco
         const result = await window.api.loadCampaign(lastFile);
         if (result.success && result.content) {
           try {
@@ -42,29 +41,22 @@ export default function App() {
             setCurrentFile(lastFile);
             setActiveSceneId(null);
           } catch (e) {
-            // Se o arquivo corrompeu, apaga a memória para não travar o app
             localStorage.removeItem('lastCampaign'); 
           }
         } else {
-          // Se o arquivo foi deletado por fora do app, apaga a memória
           localStorage.removeItem('lastCampaign');
         }
       }
     };
 
     loadLastCampaign();
-  }, []); // <-- O array vazio garante que isso só rode UMA VEZ ao abrir o app!
+  }, []); 
 
   // --- O MOTOR DO AUTO-SAVE (DEBOUNCE) CORRIGIDO ---
   useEffect(() => {
-    // Se não tem arquivo aberto, não tem onde salvar
     if (!currentFile) return;
 
-    // O CRONÔMETRO COMEÇA AQUI
-    // Ele espera 1.5 segundos de silêncio absoluto no teclado antes de agir
     const timeoutId = setTimeout(async () => {
-      
-      // Agora sim! O aviso só aparece quando ele de fato vai mandar para o disco
       setSaveStatus('saving');
       
       const dataToSave = JSON.stringify(tree, null, 2);
@@ -72,14 +64,12 @@ export default function App() {
       
       if (result.success) {
         setSaveStatus('saved');
-        // Volta para 'idle' (escondido) após 2 segundos
         setTimeout(() => setSaveStatus('idle'), 2000); 
       }
-    }, 1500); // 1.5 segundos de espera
+    }, 1500); 
 
-    // Se você digitar qualquer coisa antes de dar 1.5s, ele cancela o save anterior e zera o relógio!
     return () => clearTimeout(timeoutId);
-  }, [tree]); // Observamos apenas a Árvore de dados agora
+  }, [tree]); 
 
   // Garante que o input de renomear esteja sempre atualizado com o arquivo atual
   useEffect(() => {
@@ -88,10 +78,51 @@ export default function App() {
     }
   }, [currentFile]);
 
+  //USE EFFECT PARA TROCAR DE CENA VIA MÓDULOS (O OUVIDO BIÔNICO)
+  useEffect(() => {
+    const handleCrossSceneTeleport = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const { targetId, action, payload } = customEvent.detail;
+      
+      // Verifica se a ação veio com um bilhete de "Troca de Cena"
+      if (payload?.targetSceneId && payload.targetSceneId !== activeSceneId) {
+        
+        // 1. Muda a cena atual na barra lateral
+        setActiveSceneId(payload.targetSceneId);
+        
+        // 2. SISTEMA DE ENTREGA GARANTIDA (Correios do RPG)
+        let attempts = 0;
+        
+        const tryDispatch = () => {
+          // Procura o módulo na tela (prova de que o React terminou de desenhar a cena nova)
+          const targetEl = document.getElementById(`module-${targetId}`);
+          
+          if (targetEl) {
+            // O módulo nasceu! Dá só 50ms pro useEffect dele plugar o ouvido e atira a ação!
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('rpg-module-action', {
+                detail: { targetId, action, payload }
+              }));
+            }, 50);
+          } else if (attempts < 20) {
+            // Se o computador estiver lento e não achou, espera 50ms e tenta de novo (faz isso por até 1 segundo)
+            attempts++;
+            setTimeout(tryDispatch, 50);
+          }
+        };
+
+        // Inicia a busca!
+        setTimeout(tryDispatch, 50);
+      }
+    };
+
+    window.addEventListener('rpg-module-action', handleCrossSceneTeleport);
+    return () => window.removeEventListener('rpg-module-action', handleCrossSceneTeleport);
+  }, [activeSceneId]);
+
   // --- FUNÇÕES DE CONTROLE DA ÁRVORE ---
 
   const handleToggleFolder = (targetId: string) => {
-    // Uma função recursiva para encontrar a pasta e inverter o 'isOpen' dela
     const toggleNode = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
         if (node.id === targetId && node.type === 'folder') {
@@ -115,10 +146,8 @@ export default function App() {
     };
 
     if (parentId === null) {
-      // Adiciona na raiz
       setTree([...tree, newNode]);
     } else {
-      // Adiciona dentro de uma pasta específica
       const addNodeToParent = (nodes: CampaignNode[]): CampaignNode[] => {
         return nodes.map(node => {
           if (node.id === parentId && node.type === 'folder') {
@@ -134,25 +163,23 @@ export default function App() {
     }
   };
 
-  // --- NOVA FUNÇÃO: DELETAR NÓ ---
   const handleDeleteNode = (targetId: string) => {
     const deleteFromTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes
-        .filter(node => node.id !== targetId) // Se for o ID alvo, ele é excluído aqui
+        .filter(node => node.id !== targetId) 
         .map(node => {
           if (node.children) {
-            return { ...node, children: deleteFromTree(node.children) }; // Vasculha as subpastas
+            return { ...node, children: deleteFromTree(node.children) }; 
           }
           return node;
         });
     };
     setTree(deleteFromTree(tree));
-    if (activeSceneId === targetId) setActiveSceneId(null); // Limpa o palco se excluiu a cena atual
+    if (activeSceneId === targetId) setActiveSceneId(null); 
   };
 
   // --- FUNÇÃO AUXILIAR: DETECTOR DE PARADOXO ---
   const isDescendant = (treeNodes: CampaignNode[], draggedId: string, targetId: string): boolean => {
-    // 1. Acha o nó que está sendo arrastado
     const findNode = (nodes: CampaignNode[], id: string): CampaignNode | null => {
       for (const node of nodes) {
         if (node.id === id) return node;
@@ -166,10 +193,8 @@ export default function App() {
 
     const draggedNode = findNode(treeNodes, draggedId);
     
-    // Se o nó não foi achado ou não tem filhos (é uma cena), é impossível gerar paradoxo
     if (!draggedNode || !draggedNode.children) return false;
 
-    // 2. Vasculha todos os filhos (e netos) para ver se o alvo está lá dentro
     const checkChildren = (children: CampaignNode[]): boolean => {
       for (const child of children) {
         if (child.id === targetId) return true;
@@ -184,8 +209,6 @@ export default function App() {
   // --- FUNÇÃO ATUALIZADA: MOVER NÓ COM REORDENAÇÃO ---
   const handleMoveNode = (draggedId: string, targetId: string | null, position: 'before' | 'after' | 'inside' = 'inside') => {
     
-    // 🛡️ O ESCUDO ANTI-PARADOXO ENTRA AQUI!
-    // Se o usuário soltar a pasta nela mesma, ou dentro de um filho dela, a ação é cancelada.
     if (draggedId === targetId) return;
     if (targetId && isDescendant(tree, draggedId, targetId)) {
       console.warn("Ação bloqueada: Uma pasta não pode ser movida para dentro de seus próprios filhos.");
@@ -194,7 +217,6 @@ export default function App() {
     
     let draggedNode: CampaignNode | null = null;
 
-    // Etapa 1: Arranca o nó de onde ele estava
     const removeNode = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.filter(node => {
         if (node.id === draggedId) { draggedNode = node; return false; }
@@ -206,30 +228,25 @@ export default function App() {
     let newTree = removeNode([...tree]);
     if (!draggedNode) return;
 
-    // Etapa 2: Costura o nó no lugar novo
     if (targetId === null) {
-      newTree.push(draggedNode); // Fundo vazio = Raiz
+      newTree.push(draggedNode); 
     } else {
       const insertNode = (nodes: CampaignNode[]): CampaignNode[] => {
         const result: CampaignNode[] = [];
         
         for (const node of nodes) {
           if (node.id === targetId) {
-            // Se for pra colocar ANTES, empurra na lista primeiro
             if (position === 'before') result.push(draggedNode!);
             
-            // Se for DENTRO, coloca nos filhos
             if (position === 'inside' && node.type === 'folder') {
               result.push({ ...node, isOpen: true, children: [...(node.children || []), draggedNode!] });
             } else {
-              result.push(node); // Mantém o nó atual na lista
+              result.push(node); 
             }
 
-            // Se for DEPOIS, empurra na lista depois
             if (position === 'after') result.push(draggedNode!);
             
           } else {
-            // Se não é o alvo, só continua vasculhando
             if (node.children) {
               result.push({ ...node, children: insertNode(node.children) });
             } else {
@@ -245,15 +262,14 @@ export default function App() {
     setTree(newTree);
   };
 
-  // --- NOVA FUNÇÃO: RENOMEAR NÓ ---
   const handleRenameNode = (targetId: string, newName: string) => {
     const renameInTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
         if (node.id === targetId) {
-          return { ...node, name: newName }; // Atualiza o nome aqui!
+          return { ...node, name: newName }; 
         }
         if (node.children) {
-          return { ...node, children: renameInTree(node.children) }; // Vasculha subpastas
+          return { ...node, children: renameInTree(node.children) }; 
         }
         return node;
       });
@@ -261,39 +277,49 @@ export default function App() {
     setTree(renameInTree(tree));
   };
 
+  // 👇 NOVA FUNÇÃO: FIXAR / DESAFIXAR CENA 👇
+  const handleTogglePin = (targetId: string) => {
+    const togglePinInTree = (nodes: CampaignNode[]): CampaignNode[] => {
+      return nodes.map(node => {
+        if (node.id === targetId) {
+          return { ...node, isPinned: !node.isPinned };
+        }
+        if (node.children) {
+          return { ...node, children: togglePinInTree(node.children) };
+        }
+        return node;
+      });
+    };
+    setTree(togglePinInTree(tree));
+  };
+
+
   // --- FUNÇÕES DE GERENCIAMENTO DE CAMPANHA ---
 
   const handleNewCampaignClick = () => {
     setNewSaveName('');
-    setSaveError(''); // <-- Limpa qualquer erro antigo
+    setSaveError(''); 
     setIsSaveOpen(true);
   };
 
   const executeNewCampaign = async (fileName: string) => {
-    // 1. Padroniza o nome para a verificação (garante que tem o .json no final)
     const safeName = fileName.endsWith('.json') ? fileName : `${fileName}.json`;
 
-    // 2. Olha para dentro do Cofre de Campanhas ANTES de fazer qualquer coisa
     const listResult = await window.api.listCampaigns();
     
     if (listResult.success && listResult.files) {
-      // 3. Se o nome já existir na lista, bloqueia tudo e avisa o usuário!
       if (listResult.files.includes(safeName)) {
-        // Substituímos o alert nativo pela nossa mensagem de estado!
         setSaveError('⚠️ Já existe uma campanha com este nome. Escolha outro.');
         return;
       }
     }
 
-    // 4. Se passou pela segurança, cria a campanha vazia normalmente
     const emptyTree: CampaignNode[] = [];
     const dataToSave = JSON.stringify(emptyTree, null, 2);
     
-    // 5. Salva no disco
     const result = await window.api.saveCampaign(fileName, dataToSave);
     
     if (result.success && result.fileName) {
-      // 6. Atualiza a tela
       setTree(emptyTree);
       setActiveSceneId(null);
       setCurrentFile(result.fileName);
@@ -304,7 +330,6 @@ export default function App() {
   };
 
   const handleOpenLoadClick = async () => {
-    // Pede pro Backend a lista de arquivos e abre o modal
     const result = await window.api.listCampaigns();
     if (result.success) {
       setCampaignList(result.files);
@@ -332,11 +357,9 @@ export default function App() {
   const executeDelete = async (fileName: string) => {
     const result = await window.api.deleteCampaign(fileName);
     if (result.success) {
-      // Remove da lista visual instantaneamente
       setCampaignList(prev => prev.filter(f => f !== fileName));
-      setCampaignToDelete(null); // Fecha o modo de exclusão
+      setCampaignToDelete(null); 
       
-      // Se o usuário excluiu a campanha que está aberta agora, limpamos a tela
       if (currentFile === fileName) {
         setTree([]);
         setActiveSceneId(null);
@@ -351,28 +374,24 @@ export default function App() {
 
   const executeRenameCampaign = async () => {
     if (!currentFile || !editingCampaignName.trim()) {
-      // Se o usuário tentar deixar vazio, a gente reverte pro nome original
       setEditingCampaignName(currentFile?.replace('.json', '') || '');
       return;
     }
 
     const safeNewName = `${editingCampaignName.trim()}.json`;
-    if (safeNewName === currentFile) return; // Se o nome for igual, não faz nada
+    if (safeNewName === currentFile) return; 
 
     const result = await window.api.renameCampaign(currentFile, safeNewName);
     
     if (result.success && result.fileName) {
-      // Atualiza o estado e a memória do navegador!
       setCurrentFile(result.fileName);
       localStorage.setItem('lastCampaign', result.fileName);
     } else {
-      // Se der erro (ex: nome duplicado), avisa e reverte o texto
       alert(result.error);
       setEditingCampaignName(currentFile.replace('.json', ''));
     }
   };
 
-  // Procura na árvore a cena que está selecionada no momento
   const getActiveScene = (nodes: CampaignNode[]): CampaignNode | null => {
     for (const node of nodes) {
       if (node.id === activeSceneId && node.type === 'scene') return node;
@@ -386,7 +405,6 @@ export default function App() {
 
   const activeScene = activeSceneId ? getActiveScene(tree) : null;
 
-  // Quando o SceneManager altera um módulo, salvamos de volta na árvore
   const handleUpdateSceneModules = (sceneId: string, newModules: any[]) => {
     const updateModulesInTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
@@ -403,7 +421,6 @@ export default function App() {
   };
 
   return (
-    // Layout Principal: Flexbox que ocupa a tela toda (h-screen)
     <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans">
       
       {/* --- BARRA LATERAL (Esquerda) --- */}
@@ -413,21 +430,18 @@ export default function App() {
             <h1 className="font-bold text-emerald-500 tracking-wider text-sm uppercase">Echo Tabula</h1>
             
             <div className="flex gap-3 items-center">
-              {/* O Feedback visual do Autosave */}
               {saveStatus === 'saving' && <span className="text-[10px] text-emerald-400 animate-pulse font-medium">Salvando...</span>}
               {saveStatus === 'saved' && <span className="text-[10px] text-slate-500 font-medium">Salvo</span>}
               
               <button onClick={handleOpenLoadClick} className="text-slate-400 hover:text-blue-400 transition-colors" title="Abrir Campanha (Load)">
                 📂
               </button>
-              {/* Mudamos de Salvar para Nova Campanha */}
               <button onClick={handleNewCampaignClick} className="text-slate-400 hover:text-emerald-400 transition-colors text-lg" title="Nova Campanha">
                 ➕
               </button>
             </div>
           </div>
 
-          {/* Nome do arquivo atual em destaque e EDITÁVEL */}
           {currentFile && (
             <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-800/50 border border-slate-700/50 rounded-md focus-within:border-emerald-500 focus-within:shadow-md transition-all group">
               <span className="text-sm">📖</span>
@@ -435,8 +449,8 @@ export default function App() {
                 type="text"
                 value={editingCampaignName}
                 onChange={(e) => setEditingCampaignName(e.target.value)}
-                onBlur={executeRenameCampaign} // Salva automaticamente quando clica fora
-                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} // Salva ao dar Enter
+                onBlur={executeRenameCampaign} 
+                onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()} 
                 className="bg-transparent text-xs text-slate-300 font-medium w-full focus:outline-none focus:text-emerald-400 transition-colors"
                 title="Clique para renomear"
               />
@@ -444,7 +458,6 @@ export default function App() {
             </div>
           )}
           
-          {/* Botões grandes de criar Nova Pasta e Cena (só aparecem se tiver campanha aberta) */}
           {currentFile && (
             <div className="flex gap-2">
               <button onClick={() => handleAddNode(null, 'folder')} className="flex-1 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs py-1.5 rounded transition border border-slate-700 font-medium">
@@ -457,14 +470,13 @@ export default function App() {
           )}
         </div>
         
-        {/* A área da lista recebe eventos de Drop para enviar arquivos para a Raiz */}
         <div 
           className="flex-1 overflow-y-auto p-2 scrollbar-thin scrollbar-thumb-slate-700 h-full"
           onDragOver={(e) => e.preventDefault()}
           onDrop={(e) => {
             e.preventDefault();
             const draggedId = e.dataTransfer.getData('nodeId');
-            if(draggedId) handleMoveNode(draggedId, null, 'inside'); // <-- Atualizado aqui
+            if(draggedId) handleMoveNode(draggedId, null, 'inside'); 
           }}
         >
           <Sidebar 
@@ -475,7 +487,8 @@ export default function App() {
             onAddNode={handleAddNode}
             onDeleteNode={handleDeleteNode}
             onMoveNode={handleMoveNode}
-            onRenameNode={handleRenameNode} // <-- A nova propriedade plugada aqui!
+            onRenameNode={handleRenameNode}
+            onTogglePin={handleTogglePin} // 👇 AQUI ESTÁ A CONEXÃO 👇
           />
         </div>
       </div>
@@ -485,6 +498,7 @@ export default function App() {
         {activeScene ? (
           <SceneManager 
             scene={activeScene} 
+            campaignNodes={tree} // <-- TEM QUE TER ISSO AQUI
             onUpdateModules={handleUpdateSceneModules}
             onRenameScene={handleRenameNode}
           />
@@ -497,7 +511,6 @@ export default function App() {
 
       {/* ================= MODAIS FLUTUANTES ================= */}
       
-      {/* MODAL DE NOVA CAMPANHA */}
       {isSaveOpen && (
         <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl w-96 flex flex-col gap-4">
@@ -509,14 +522,13 @@ export default function App() {
               value={newSaveName}
               onChange={(e) => {
                 setNewSaveName(e.target.value);
-                setSaveError(''); // Se o usuário começou a digitar para corrigir, o erro some!
+                setSaveError(''); 
               }}
               placeholder="Ex: A_Mina_Perdida"
               className={`bg-slate-950 border ${saveError ? 'border-red-500 focus:border-red-500' : 'border-slate-700 focus:border-emerald-500'} text-slate-200 p-2 rounded focus:outline-none transition-colors`}
               onKeyDown={(e) => e.key === 'Enter' && newSaveName.trim() && executeNewCampaign(newSaveName.trim())}
             />
             
-            {/* A Mensagem de Erro Condicional */}
             {saveError && (
               <p className="text-red-400 text-sm animate-pulse">{saveError}</p>
             )}
@@ -534,7 +546,6 @@ export default function App() {
         </div>
       )}
 
-      {/* MODAL DE CARREGAR (O Explorador de Arquivos Interno) */}
       {isLoadOpen && (
         <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl w-[500px] flex flex-col max-h-[80vh]">
@@ -552,7 +563,6 @@ export default function App() {
                     key={file} 
                     className="flex items-center justify-between p-3 bg-slate-800/50 hover:bg-slate-700/30 border border-transparent rounded-lg transition group"
                   >
-                    {/* SE ESTIVER EM MODO DE EXCLUSÃO, MOSTRA A CONFIRMAÇÃO */}
                     {campaignToDelete === file ? (
                       <div className="flex-1 flex justify-between items-center text-red-400 bg-red-950/30 -m-3 p-3 rounded-lg border border-red-900/50">
                         <span className="text-sm font-bold flex items-center gap-2">
@@ -574,7 +584,6 @@ export default function App() {
                         </div>
                       </div>
                     ) : (
-                      /* SE NÃO ESTIVER, MOSTRA O VISUAL NORMAL DE ABRIR */
                       <>
                         <div 
                           className="flex items-center gap-3 cursor-pointer flex-1"
@@ -586,10 +595,9 @@ export default function App() {
                           </span>
                         </div>
                         
-                        {/* BOTÃO DE LIXEIRA */}
                         <button 
                           onClick={(e) => {
-                            e.stopPropagation(); // Impede que o clique carregue a campanha
+                            e.stopPropagation(); 
                             setCampaignToDelete(file);
                           }} 
                           className="opacity-0 group-hover:opacity-100 p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded transition"
@@ -606,6 +614,8 @@ export default function App() {
           </div>
         </div>
       )}
+      {/* O MINI-PLAYER DO SPOTIFY FICA AQUI */}
+      <GlobalAudioPlayer />
 
     </div>
   );

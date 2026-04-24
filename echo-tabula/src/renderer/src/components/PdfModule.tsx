@@ -185,16 +185,28 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
     const handleModuleAction = (event: Event) => {
       const customEvent = event as CustomEvent;
       const { targetId, action, payload } = customEvent.detail;
+      
       if (targetId !== moduleData.id) return;
+      
       if (action === 'openBookmark' && payload?.bookmarkId) {
         const targetBookmark = bookmarks.find(b => b.id === payload.bookmarkId);
+        
         if (targetBookmark) {
-          jumpToPage(targetBookmark.page);
+          // Atualiza a caixinha de texto local e avisa que vai precisar scrollar a tela
+          setInputPage(targetBookmark.page.toString());
           setPendingAutoScroll(true);
-          onUpdate(moduleData.id, { isMinimized: false });
+          
+          // O SEGREDO ESTÁ AQUI:
+          // Em vez de chamar o onUpdate duas vezes (o que faz o React cancelar a primeira),
+          // enviamos TUDO em um único pacote! Abre o módulo E muda a página de uma vez só.
+          onUpdate(moduleData.id, { 
+            isMinimized: false,
+            data: { ...moduleData.data, page: targetBookmark.page }
+          });
         }
       }
     };
+    
     window.addEventListener('rpg-module-action', handleModuleAction);
     return () => window.removeEventListener('rpg-module-action', handleModuleAction);
   }, [moduleData.id, moduleData.data, bookmarks, onUpdate]);

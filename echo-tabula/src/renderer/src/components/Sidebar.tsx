@@ -10,19 +10,31 @@ interface SidebarProps {
   onToggleFolder: (id: string) => void;
   onAddNode: (parentId: string | null, type: 'folder' | 'scene') => void;
   onDeleteNode: (id: string) => void;
-  // ATUALIZAMOS A FUNÇÃO DE MOVER AQUI:
   onMoveNode: (draggedId: string, targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onRenameNode: (id: string, newName: string) => void;
+  onTogglePin: (id: string) => void; // 👈 NOVA FUNÇÃO PARA FIXAR
   level?: number; 
 }
 
+// --- FUNÇÃO AUXILIAR: Encontrar todas as cenas fixadas ---
+const getPinnedScenes = (nodes: CampaignNode[]): CampaignNode[] => {
+  let pinned: CampaignNode[] = [];
+  for (const node of nodes) {
+    if (node.type === 'scene' && node.isPinned) {
+      pinned.push(node);
+    }
+    if (node.children) {
+      pinned = pinned.concat(getPinnedScenes(node.children));
+    }
+  }
+  return pinned;
+};
+
 function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps }) {
-  const { activeSceneId, onSelectScene, onToggleFolder, onAddNode, onDeleteNode, onMoveNode, onRenameNode, level = 0 } = props;
+  const { activeSceneId, onSelectScene, onToggleFolder, onAddNode, onDeleteNode, onMoveNode, onRenameNode, onTogglePin, level = 0 } = props;
   
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(node.name);
-  
-  // NOVO: Estado para saber ONDE o drag está acontecendo
   const [dragPosition, setDragPosition] = useState<'before' | 'after' | 'inside' | null>(null);
 
   const handleSaveRename = () => {
@@ -39,7 +51,6 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
     if (e.key === 'Escape') { setIsEditing(false); setEditName(node.name); }
   };
 
-  // Lógica visual do Drop (Sombras Azuis sem quebrar o layout)
   const dragClass = dragPosition === 'before' ? 'shadow-[0_-2px_0_0_#3b82f6] z-10' :
                     dragPosition === 'after'  ? 'shadow-[0_2px_0_0_#3b82f6] z-10' :
                     dragPosition === 'inside' ? 'bg-blue-600/30 ring-1 ring-blue-500 z-10' : '';
@@ -53,23 +64,22 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
           e.stopPropagation();
           e.dataTransfer.setData('nodeId', node.id);
         }}
-        // A MÁGICA DA MATEMÁTICA ACONTECE AQUI:
         onDragOver={(e) => {
           e.preventDefault(); 
           e.stopPropagation();
           if (isEditing) return;
 
           const rect = e.currentTarget.getBoundingClientRect();
-          const y = e.clientY - rect.top; // Posição Y do mouse dentro do elemento
+          const y = e.clientY - rect.top; 
 
           if (y < rect.height * 0.25) {
-            setDragPosition('before'); // Mouse no topo (25%)
+            setDragPosition('before'); 
           } else if (y > rect.height * 0.75) {
-            setDragPosition('after');  // Mouse no fundo (25%)
+            setDragPosition('after');  
           } else if (node.type === 'folder') {
-            setDragPosition('inside'); // Mouse no meio de uma pasta
+            setDragPosition('inside'); 
           } else {
-            setDragPosition('after');  // Mouse no meio de uma cena (cenas não recebem itens dentro)
+            setDragPosition('after');  
           }
         }}
         onDragLeave={() => setDragPosition(null)}
@@ -116,6 +126,18 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
 
         {!isEditing && (
           <div className="hidden group-hover:flex items-center gap-1 shrink-0">
+            
+            {/* 👇 BOTÃO DE FIXAR CENA AQUI 👇 */}
+            {node.type === 'scene' && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onTogglePin(node.id); }} 
+                className={`text-xs p-1 transition-colors ${node.isPinned ? 'text-amber-400' : 'text-slate-500 hover:text-amber-400'}`}
+                title={node.isPinned ? "Desafixar Cena" : "Fixar Cena no Topo"}
+              >
+                📌
+              </button>
+            )}
+
             {node.type === 'folder' && (
               <>
                 <button onClick={(e) => { e.stopPropagation(); onAddNode(node.id, 'folder'); }} className="text-xs text-slate-500 hover:text-emerald-400 p-1">+📂</button>
@@ -135,21 +157,56 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
 }
 
 export function Sidebar(props: SidebarProps) {
-  // Descobre se estamos desenhando a lista principal (raiz) ou uma sub-pasta
   const isRoot = props.level === undefined || props.level === 0;
+  
+  // Se for a raiz, extraímos as cenas fixadas!
+  const pinnedScenes = isRoot ? getPinnedScenes(props.nodes) : [];
 
   return (
-    // Se for a raiz, forçamos ele a ocupar a altura toda para o mt-auto funcionar
     <div className={`w-full flex flex-col gap-[2px] ${isRoot ? 'h-full' : ''}`}>
       
-      {/* 1. A LISTA DE PASTAS E CENAS */}
+      {/* 👇 1. SESSÃO DE CENAS FIXADAS (SÓ APARECE NA RAIZ) 👇 */}
+      {isRoot && pinnedScenes.length > 0 && (
+        <div className="mb-4">
+          <div className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider mb-1 px-2 flex items-center gap-2">
+            <span>Acesso Rápido</span>
+          </div>
+          <div className="flex flex-col gap-[2px]">
+            {pinnedScenes.map(scene => (
+              <div 
+                key={`pinned-${scene.id}`}
+                onClick={() => props.onSelectScene(scene.id)}
+                className={`flex items-center justify-between py-1.5 px-2 rounded cursor-pointer transition-colors group ${
+                  props.activeSceneId === scene.id ? 'bg-amber-600/20 text-amber-400 border border-amber-600/30' : 'text-slate-300 hover:bg-slate-800'
+                }`}
+              >
+                <div className="flex items-center gap-2 truncate">
+                  <span className="text-sm shrink-0">📌</span>
+                  <span className="text-sm truncate">{scene.name}</span>
+                </div>
+                <button 
+                  onClick={(e) => { e.stopPropagation(); props.onTogglePin(scene.id); }} 
+                  className="hidden group-hover:block text-xs text-slate-500 hover:text-slate-300 p-1"
+                  title="Desafixar"
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
+          {/* Linha divisória */}
+          <div className="h-px bg-slate-700/50 mx-2 mt-3 mb-1" />
+        </div>
+      )}
+
+      {/* 2. A ÁRVORE PRINCIPAL DE PASTAS E CENAS */}
       <div className="flex flex-col gap-[2px]">
         {props.nodes.map((node) => (
           <SidebarNode key={node.id} node={node} props={props} />
         ))}
       </div>
 
-      {/* 2. A VERSÃO (SÓ APARECE NA RAIZ!) */}
+      {/* 3. A VERSÃO */}
       {isRoot && (
         <div className="mt-auto pb-2 pt-10 w-full flex justify-center">
           <span className="text-[10px] text-slate-500/50 font-mono font-bold select-none pointer-events-none">

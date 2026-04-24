@@ -1,6 +1,6 @@
 // src/renderer/src/components/AudioModule.tsx
 import { AudioModule as AudioModuleType, RpgModule } from '../types/rpg';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
 interface Props {
   moduleData: AudioModuleType;
@@ -9,21 +9,47 @@ interface Props {
 
 export function AudioModule({ moduleData, onUpdate }: Props) {
   const [isEditing, setIsEditing] = useState(false);
-  const [isPlaying, setIsPlaying] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   
-  const audioRef = useRef<HTMLAudioElement>(null);
   const url = moduleData.data.urlOrPath || "";
 
-  // --- NOVA FUNÇÃO: REINICIAR ÁUDIO ---
-  const handleRestart = () => {
-    if (audioRef.current) {
-      audioRef.current.currentTime = 0; // Volta o disco pro começo!
-      setIsPlaying(true); // Garante que vai tocar
+  // 👇 LÊ A COLINHA NA INICIALIZAÇÃO! (Fim da amnésia visual) 👇
+  const [isGloballyPlaying, setIsGloballyPlaying] = useState(() => {
+    const playingUrls = (window as any).__globalAudioPlayingUrls || [];
+    return playingUrls.includes(url);
+  });
+
+  useEffect(() => {
+    const handleStatus = (e: Event) => {
+      const { playingUrls } = (e as CustomEvent).detail;
+      setIsGloballyPlaying(playingUrls.includes(url));
+    };
+    window.addEventListener('global-audio-status', handleStatus);
+    return () => window.removeEventListener('global-audio-status', handleStatus);
+  }, [url]);
+
+  useEffect(() => {
+    if (url) {
+      window.dispatchEvent(new CustomEvent('update-global-track', {
+        detail: { url, volume: moduleData.data.volume, loop: moduleData.data.loop }
+      }));
     }
+  }, [moduleData.data.volume, moduleData.data.loop, url]);
+
+  // --- FUNÇÕES DE CONTROLE REMOTO ---
+  const handlePlayToggle = () => {
+    // 👇 AGORA O MÓDULO SÓ REPASSA A BOLA! O MIXER DECIDE O QUE FAZER 👇
+    window.dispatchEvent(new CustomEvent('toggle-global-track', {
+      detail: { url, title: moduleData.name, volume: moduleData.data.volume, loop: moduleData.data.loop }
+    }));
   };
 
-  // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
+  const handleRestart = () => {
+    window.dispatchEvent(new CustomEvent('add-global-track', {
+        detail: { url, title: moduleData.name, volume: moduleData.data.volume, loop: moduleData.data.loop, restart: true }
+    }));
+  };
+
   useEffect(() => {
     const handleModuleAction = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -32,97 +58,48 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
       if (targetId !== moduleData.id) return;
 
       if (action === 'play') {
-        setIsPlaying(true);
-        if (moduleData.isMinimized) onUpdate(moduleData.id, { isMinimized: false });
+        window.dispatchEvent(new CustomEvent('add-global-track', {
+          detail: { url, title: moduleData.name, volume: moduleData.data.volume, loop: moduleData.data.loop }
+        }));
       }
-      if (action === 'pause') setIsPlaying(false);
-      if (action === 'toggle') setIsPlaying(prev => !prev);
-      
-      // 👇 NOVO: Link de texto agora pode forçar o reinício do som!
-      if (action === 'restart') {
-        handleRestart();
-        if (moduleData.isMinimized) onUpdate(moduleData.id, { isMinimized: false });
-      }
+      if (action === 'pause') window.dispatchEvent(new CustomEvent('pause-global-track', { detail: { url } }));
+      if (action === 'toggle') handlePlayToggle();
+      if (action === 'restart') handleRestart();
     };
 
     window.addEventListener('rpg-module-action', handleModuleAction);
     return () => window.removeEventListener('rpg-module-action', handleModuleAction);
-  }, [moduleData.id, moduleData.isMinimized, onUpdate]); 
-
-  // Sincronização de Volume e Play/Pause
-  useEffect(() => {
-    if (audioRef.current) {
-      audioRef.current.volume = moduleData.data.volume;
-      
-      if (isPlaying) {
-        audioRef.current.play().catch(e => {
-          console.warn("Reprodução bloqueada:", e);
-          setIsPlaying(false);
-        });
-      } else {
-        audioRef.current.pause();
-      }
-    }
-  }, [isPlaying, moduleData.data.volume, url]);
+  }, [moduleData.id, url, moduleData.name, moduleData.data.volume, moduleData.data.loop]); // Removemos o isGloballyPlaying da dependência!
 
   const importAudio = async () => {
     try {
       setIsLoading(true);
       const result = await (window as any).electron.ipcRenderer.invoke('fs:importAsset');
-      if (result && result.success) {
-        const newUrl = `rpg://${result.fileName}`;
-        onUpdate(moduleData.id, { data: { ...moduleData.data, urlOrPath: newUrl } });
-        setIsPlaying(false);
-      }
-    } catch (error) {
-      console.error("Erro ao importar:", error);
-    } finally {
-      setIsLoading(false);
-    }
+      if (result && result.success) onUpdate(moduleData.id, { data: { ...moduleData.data, urlOrPath: `rpg://${result.fileName}` } });
+    } catch (error) { console.error(error); } finally { setIsLoading(false); }
   };
 
   const selectFromVault = async () => {
     try {
       setIsLoading(true);
       const result = await (window as any).electron.ipcRenderer.invoke('fs:selectFromVault');
-      if (result && result.success) {
-        const newUrl = `rpg://${result.fileName}`;
-        onUpdate(moduleData.id, { data: { ...moduleData.data, urlOrPath: newUrl } });
-        setIsPlaying(false);
-      }
-    } catch (error) {
-      console.error("Erro ao escolher do cofre:", error);
-    } finally {
-      setIsLoading(false);
-    }
+      if (result && result.success) onUpdate(moduleData.id, { data: { ...moduleData.data, urlOrPath: `rpg://${result.fileName}` } });
+    } catch (error) { console.error(error); } finally { setIsLoading(false); }
   };
 
   if (!moduleData.isActive) return null;
 
   return (
     <div id={`module-${moduleData.id}`} className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-blue-500 focus-within:shadow-blue-900/20">
-      
-      {/* CABEÇALHO */}
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2 flex-1">
           <span className="text-blue-400">🎵</span>
-          <input 
-            type="text"
-            value={moduleData.name}
-            onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })}
-            className="bg-transparent text-blue-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-blue-800"
-            placeholder="Nome da Trilha"
-          />
+          <input type="text" value={moduleData.name} onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })} className="bg-transparent text-blue-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-blue-800" placeholder="Nome da Trilha" />
         </div>
-        <button onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })} className="text-slate-500 hover:text-blue-400 px-2 py-1 rounded transition text-sm font-bold">
-          {moduleData.isMinimized ? '▼' : '▲'}
-        </button>
-        <button onClick={() => setIsEditing(!isEditing)} className="text-slate-400 hover:text-white text-sm bg-slate-700 px-2 py-1 rounded ml-2">
-          {isEditing ? 'Ocultar Config' : '⚙️ Configurar'}
-        </button>
+        <button onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })} className="text-slate-500 hover:text-blue-400 px-2 py-1 rounded text-sm font-bold">{moduleData.isMinimized ? '▼' : '▲'}</button>
+        <button onClick={() => setIsEditing(!isEditing)} className="text-slate-400 hover:text-white text-sm bg-slate-700 px-2 py-1 rounded ml-2">{isEditing ? 'Ocultar Config' : '⚙️ Configurar'}</button>
       </div>
 
-      {/* PAINEL DE CONTROLES */}
       {!moduleData.isMinimized && (
         <div className="p-4 flex flex-col gap-3">
           {isEditing && (
@@ -130,93 +107,42 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
               <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
                 <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wide">Cofre de Mídia</label>
                 <div className="flex gap-2">
-                  <button onClick={importAudio} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-3 rounded shadow transition">
-                    📥 Importar Novo (.mp3)
-                  </button>
-                  <button onClick={selectFromVault} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-sm py-2 px-3 rounded shadow transition border border-slate-600">
-                    🗃️ Escolher do Cofre
-                  </button>
+                  <button onClick={importAudio} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-3 rounded shadow transition">📥 Importar Novo</button>
+                  <button onClick={selectFromVault} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-sm py-2 px-3 rounded border border-slate-600 transition">🗃️ Escolher do Cofre</button>
                 </div>
               </div>
-
               <div>
                 <label className="block text-xs text-slate-400 mb-1">Caminho ou URL</label>
-                <input 
-                  type="text"
-                  value={moduleData.data.urlOrPath}
-                  onChange={(e) => onUpdate(moduleData.id, { data: { ...moduleData.data, urlOrPath: e.target.value } })}
-                  className="w-full bg-slate-800 text-slate-200 text-sm p-2 rounded border border-slate-600 focus:outline-none"
-                />
+                <input type="text" value={url} onChange={(e) => onUpdate(moduleData.id, { data: { ...moduleData.data, urlOrPath: e.target.value } })} className="w-full bg-slate-800 text-slate-200 text-sm p-2 rounded border border-slate-600 focus:outline-none" />
               </div>
-
               <div className="flex items-center gap-4">
                 <div className="flex-1">
                   <label className="block text-xs text-slate-400 mb-1">Volume: {Math.round(moduleData.data.volume * 100)}%</label>
-                  <input 
-                    type="range" min="0" max="1" step="0.05"
-                    value={moduleData.data.volume}
-                    onChange={(e) => onUpdate(moduleData.id, { data: { ...moduleData.data, volume: parseFloat(e.target.value) } })}
-                    className="w-full accent-blue-500"
-                  />
+                  <input type="range" min="0" max="1" step="0.05" value={moduleData.data.volume} onChange={(e) => onUpdate(moduleData.id, { data: { ...moduleData.data, volume: parseFloat(e.target.value) } })} className="w-full accent-blue-500" />
                 </div>
                 <label className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
-                  <input 
-                    type="checkbox" checked={moduleData.data.loop}
-                    onChange={(e) => onUpdate(moduleData.id, { data: { ...moduleData.data, loop: e.target.checked } })}
-                    className="accent-blue-500"
-                  />
-                  Loop
+                  <input type="checkbox" checked={moduleData.data.loop} onChange={(e) => onUpdate(moduleData.id, { data: { ...moduleData.data, loop: e.target.checked } })} className="accent-blue-500" /> Loop
                 </label>
               </div>
             </div>
           )}
 
-          {/* 👇 NOVA ÁREA DE BOTÕES DE REPRODUÇÃO 👇 */}
           <div className="flex items-center gap-2 bg-slate-900/50 p-2 rounded border border-slate-800 shadow-inner">
-            
-            {/* O NOVO BOTÃO DE REINICIAR (Voltar ao começo) */}
+            <button onClick={handleRestart} disabled={!url} className="w-10 h-10 rounded-full flex items-center justify-center text-lg transition flex-shrink-0 bg-slate-700 hover:bg-blue-600 text-white disabled:bg-slate-800 disabled:opacity-50 shadow" title="Reiniciar áudio do zero">⏮</button>
             <button 
-              onClick={handleRestart}
-              disabled={!url}
-              className="w-10 h-10 rounded-full flex items-center justify-center text-lg transition flex-shrink-0 bg-slate-700 hover:bg-blue-600 text-white disabled:bg-slate-800 disabled:opacity-50 shadow"
-              title="Reiniciar áudio do zero"
-            >
-              ⏮
-            </button>
-
-            {/* O BOTÃO ORIGINAL DE PLAY / PAUSE */}
-            <button 
-              onClick={() => setIsPlaying(!isPlaying)}
-              disabled={!url}
+              onClick={handlePlayToggle} disabled={!url}
               className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-lg transition flex-shrink-0
-                ${isPlaying ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} 
+                ${isGloballyPlaying ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} 
                 disabled:bg-slate-700 disabled:opacity-50`}
-              title={isPlaying ? "Pausar" : "Tocar"}
             >
-              {isLoading && isPlaying ? '⏳' : isPlaying ? '⏸' : '▶'}
+              {isLoading && isGloballyPlaying ? '⏳' : isGloballyPlaying ? '⏸' : '▶'}
             </button>
-
             <div className="flex-1 overflow-hidden pl-2">
               <p className="text-xs text-slate-400 truncate">{url ? url : 'Nenhuma mídia.'}</p>
             </div>
           </div>
-
         </div>
       )}
-
-      {/* MOTOR DE ÁUDIO */}
-      <div className="hidden">
-        {url && (
-          <audio 
-            ref={audioRef} 
-            src={url} 
-            loop={moduleData.data.loop} 
-            onWaiting={() => setIsLoading(true)}
-            onCanPlay={() => setIsLoading(false)}
-            onEnded={() => { if (!moduleData.data.loop) setIsPlaying(false); }}
-          />
-        )}
-      </div>
     </div>
   );
 }

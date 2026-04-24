@@ -124,6 +124,6 @@ export interface CampaignNode {
   name: string;
   isOpen?: boolean;
   children?: CampaignNode[];
-  // NOVA PROPRIEDADE (Opcional, pois Pastas não têm módulos, só Cenas)
+  isPinned?: boolean;
   modules?: RpgModule[]; 
 }
