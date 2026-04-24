@@ -85,6 +85,7 @@ export interface DicePreset {
     d100: number;
   };
   modifier: number; // O bônus mágico (ex: +4)
+  mode?: 'sum' | 'highest' | 'lowest';
 }
 
 export interface DiceRollerModule extends BaseModule {

@@ -7,9 +7,12 @@ interface Props {
   onUpdate: (id: string, updatedFields: Partial<RpgModule>) => void;
 }
 
+type RollMode = 'sum' | 'highest' | 'lowest';
+
 interface RollResult {
   total: number;
   modifier: number;
+  mode: RollMode;
   details: { face: number; rolls: number[] }[];
 }
 
@@ -20,7 +23,11 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
   const [diceCounts, setDiceCounts] = useState<Record<number, number>>({
     4: 0, 6: 0, 8: 0, 10: 0, 12: 0, 20: 0, 100: 0
   });
-  const [modifier, setModifier] = useState<number>(0);
+  // 👇 FIX 1: O estado agora aceita string vazia para facilitar a digitação
+  const [modifier, setModifier] = useState<number | ''>(0);
+  // 👇 FIX 2: O novo estado para controlar a lógica da rolagem
+  const [rollMode, setRollMode] = useState<RollMode>('sum'); 
+  
   const [isRolling, setIsRolling] = useState(false);
   const [rollResult, setRollResult] = useState<RollResult | null>(null);
 
@@ -31,7 +38,6 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
   const presets: DicePreset[] = moduleData.data.presets || [];
 
   // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
-  
   useEffect(() => {
     const handleModuleAction = (event: Event) => {
       const customEvent = event as CustomEvent;
@@ -46,21 +52,21 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
           // 1. Carrega os dados do preset na mesa visualmente
           setDiceCounts(targetPreset.dice);
           setModifier(targetPreset.modifier);
+          setRollMode(targetPreset.mode || 'sum'); // 👈 Carrega o modo
           
-          // 2. Avisa o Pai para expandir o módulo caso esteja minimizado
           if (moduleData.isMinimized) {
             onUpdate(moduleData.id, { isMinimized: false });
           }
 
-          // 3. (MÁGICA EXTRA) - Simula o clique no botão de rolar usando os dados do preset!
-          // Fazemos um setTimeout rapidinho pra dar tempo do React atualizar a mesa visualmente
           setTimeout(() => {
             setIsRolling(true);
             setRollResult(null); 
             
             setTimeout(() => {
-              let grandTotal = 0;
+              const safeModifier = Number(targetPreset.modifier) || 0;
+              const modeToRoll = targetPreset.mode || 'sum';
               const details: { face: number; rolls: number[] }[] = [];
+              let allRolls: number[] = []; // Guarda TODOS os dados rolados para achar o maior/menor
         
               diceFaces.forEach(face => {
                 const count = targetPreset.dice[face];
@@ -69,16 +75,23 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
                   for (let i = 0; i < count; i++) {
                     const roll = Math.floor(Math.random() * face) + 1;
                     rolls.push(roll);
-                    grandTotal += roll;
+                    allRolls.push(roll);
                   }
                   details.push({ face, rolls });
                 }
               });
         
-              grandTotal += targetPreset.modifier;
-              setRollResult({ total: grandTotal, modifier: targetPreset.modifier, details });
+              // 👇 LÓGICA DE CALCULO BASEADA NO MODO
+              let baseTotal = 0;
+              if (modeToRoll === 'highest') baseTotal = Math.max(...allRolls);
+              else if (modeToRoll === 'lowest') baseTotal = Math.min(...allRolls);
+              else baseTotal = allRolls.reduce((a, b) => a + b, 0);
+
+              const grandTotal = baseTotal + safeModifier;
+
+              setRollResult({ total: grandTotal, modifier: safeModifier, mode: modeToRoll, details });
               setIsRolling(false); 
-            }, 600); // O tempo da animação dos dados
+            }, 600);
           }, 100); 
         }
       }
@@ -87,7 +100,6 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
     window.addEventListener('rpg-module-action', handleModuleAction);
     return () => window.removeEventListener('rpg-module-action', handleModuleAction);
   }, [moduleData.id, moduleData.isMinimized, presets, onUpdate]); 
-  // 👆 FIM DO BLOCO ADICIONADO 👆
 
   // --- FUNÇÕES DA MESA ---
   const handleAddDie = (face: number) => {
@@ -102,10 +114,11 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
   const clearTable = () => {
     setDiceCounts({ 4: 0, 6: 0, 8: 0, 10: 0, 12: 0, 20: 0, 100: 0 });
     setModifier(0);
+    setRollMode('sum'); // Reseta para soma padrão
     setRollResult(null);
   };
 
-  // --- FUNÇÕES DE PRESET (A FASE 3) ---
+  // --- FUNÇÕES DE PRESET ---
   const hasDiceOnTable = Object.values(diceCounts).some(count => count > 0);
 
   const handleSavePreset = () => {
@@ -114,15 +127,16 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
     const newPreset: DicePreset = {
       id: crypto.randomUUID(),
       name: newPresetName.trim(),
-      dice: { ...diceCounts } as DicePreset['dice'], // Copia exata do que está na mesa
-      modifier: modifier
+      dice: { ...diceCounts } as DicePreset['dice'],
+      modifier: Number(modifier) || 0,
+      mode: rollMode // 👈 Salva a regra escolhida no preset
     };
 
     onUpdate(moduleData.id, {
       data: { ...moduleData.data, presets: [...presets, newPreset] }
     });
 
-    setNewPresetName(''); // Limpa o campo de nome
+    setNewPresetName('');
   };
 
   const handleRemovePreset = (presetId: string) => {
@@ -132,11 +146,11 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
     });
   };
 
-  // Quando clica no Preset, ele joga todos os dados na mesa de uma vez!
   const loadPreset = (preset: DicePreset) => {
     setDiceCounts(preset.dice);
     setModifier(preset.modifier);
-    setRollResult(null); // Limpa o resultado antigo para não confundir
+    setRollMode(preset.mode || 'sum'); // 👈 Aplica o modo na UI
+    setRollResult(null);
   };
 
   // --- O MOTOR DE ROLAGEM ---
@@ -147,8 +161,9 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
     setRollResult(null); 
 
     setTimeout(() => {
-      let grandTotal = 0;
+      const safeModifier = Number(modifier) || 0;
       const details: { face: number; rolls: number[] }[] = [];
+      let allRolls: number[] = [];
 
       diceFaces.forEach(face => {
         const count = diceCounts[face];
@@ -157,15 +172,21 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
           for (let i = 0; i < count; i++) {
             const roll = Math.floor(Math.random() * face) + 1;
             rolls.push(roll);
-            grandTotal += roll;
+            allRolls.push(roll);
           }
           details.push({ face, rolls });
         }
       });
 
-      grandTotal += modifier;
+      // 👇 MESMA LÓGICA DE CALCULO APLICADA AQUI
+      let baseTotal = 0;
+      if (rollMode === 'highest') baseTotal = Math.max(...allRolls);
+      else if (rollMode === 'lowest') baseTotal = Math.min(...allRolls);
+      else baseTotal = allRolls.reduce((a, b) => a + b, 0);
 
-      setRollResult({ total: grandTotal, modifier, details });
+      const grandTotal = baseTotal + safeModifier;
+
+      setRollResult({ total: grandTotal, modifier: safeModifier, mode: rollMode, details });
       setIsRolling(false); 
     }, 600);
   };
@@ -175,7 +196,6 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
   return (
     <div id={`module-${moduleData.id}`}className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-indigo-500 focus-within:shadow-indigo-900/20">
       
-      {/* ANIMAÇÃO */}
       <style>{`
         @keyframes diceShake {
           0% { transform: translate(1px, 1px) rotate(0deg); }
@@ -216,7 +236,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
       {!moduleData.isMinimized && (
         <div className="p-4 flex flex-col gap-5">
           
-          {/* --- A FÁBRICA DE PRESETS (FASE 3) --- */}
+          {/* --- A FÁBRICA DE PRESETS --- */}
           {isEditing && (
             <div className="bg-slate-900 p-4 rounded border border-slate-700 shadow-inner flex flex-col gap-3">
               <h4 className="text-sm font-bold text-indigo-400 mb-1">Salvar Rolagem Atual</h4>
@@ -242,7 +262,6 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
                 </button>
               </div>
 
-              {/* LISTA DE PRESETS SALVOS */}
               <div className="flex flex-wrap gap-2 mt-2">
                 {presets.length === 0 ? (
                   <p className="text-xs text-slate-500 italic">Nenhum preset salvo nesta mesa.</p>
@@ -303,20 +322,38 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
               })}
             </div>
 
-            <div className="flex items-center gap-4 w-full max-w-md bg-slate-900 p-2 rounded-full border border-slate-800 shadow-md">
-              <div className="flex items-center pl-4 gap-2">
-                <span className="text-slate-400 font-bold text-sm">Bônus</span>
+            {/* 👇 PAINEL INFERIOR COM MODO, BÔNUS E BOTÃO */}
+            <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-2xl bg-slate-900 p-2 sm:rounded-full rounded-xl border border-slate-800 shadow-md">
+              
+              {/* O NOVO SELETOR DE MODO */}
+              <div className="flex items-center pl-4 gap-2 border-r border-slate-700 pr-3">
+                <span className="text-slate-400 font-bold text-xs uppercase tracking-wider hidden sm:inline">Regra:</span>
+                <select 
+                  value={rollMode} 
+                  onChange={(e) => setRollMode(e.target.value as RollMode)}
+                  className="bg-transparent text-indigo-300 font-bold text-sm focus:outline-none cursor-pointer"
+                >
+                  <option value="sum" className="bg-slate-900">Somar Tudo (+)</option>
+                  <option value="highest" className="bg-slate-900">Pegar o Maior (↑)</option>
+                  <option value="lowest" className="bg-slate-900">Pegar o Menor (↓)</option>
+                </select>
+              </div>
+
+              {/* INPUT DE BÔNUS CORRIGIDO */}
+              <div className="flex items-center gap-2 px-3">
+                <span className="text-slate-400 font-bold text-xs uppercase tracking-wider">Bônus:</span>
                 <input 
                   type="number"
                   value={modifier}
-                  onChange={(e) => setModifier(Number(e.target.value) || 0)}
+                  onChange={(e) => setModifier(e.target.value === '' ? '' : Number(e.target.value))}
                   className="w-16 bg-slate-950 border border-slate-700 text-indigo-400 font-black text-center p-1.5 rounded focus:outline-none focus:border-indigo-500"
                 />
               </div>
+
               <button 
                 onClick={executeRoll}
                 disabled={isRolling || !hasDiceOnTable}
-                className={`flex-1 font-black text-lg uppercase tracking-wider py-2 px-6 rounded-full transition-all shadow-lg
+                className={`flex-1 font-black text-sm sm:text-lg uppercase tracking-wider py-2 px-4 sm:px-6 sm:rounded-full rounded-lg transition-all shadow-lg mt-2 sm:mt-0 w-full sm:w-auto
                   ${isRolling ? 'bg-slate-700 text-slate-400 cursor-not-allowed' : 'bg-indigo-500 hover:bg-indigo-400 text-white shadow-indigo-900/50 hover:shadow-indigo-500/50'}`}
               >
                 {isRolling ? 'Rolando...' : 'Rolar os Dados!'}
@@ -327,7 +364,9 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
             {rollResult && !isRolling && (
               <div className="mt-6 w-full max-w-md animate-in zoom-in-95 fade-in duration-200">
                 <div className="bg-indigo-950/40 border border-indigo-500/50 rounded-xl p-4 flex flex-col items-center shadow-[0_0_30px_rgba(99,102,241,0.15)]">
-                  <p className="text-indigo-300 text-sm font-bold uppercase tracking-widest mb-1">Resultado Total</p>
+                  <p className="text-indigo-300 text-sm font-bold uppercase tracking-widest mb-1">
+                    {rollResult.mode === 'highest' ? 'Maior Valor' : rollResult.mode === 'lowest' ? 'Menor Valor' : 'Resultado Total'}
+                  </p>
                   <h1 className="text-6xl font-black text-white mb-4 drop-shadow-md">{rollResult.total}</h1>
                   <div className="w-full bg-slate-950/50 rounded-lg p-3 border border-slate-800/50">
                     <p className="text-xs text-slate-500 mb-2 font-mono uppercase">Detalhamento:</p>
