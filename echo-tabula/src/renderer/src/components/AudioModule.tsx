@@ -15,36 +15,39 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
   const audioRef = useRef<HTMLAudioElement>(null);
   const url = moduleData.data.urlOrPath || "";
 
+  // --- NOVA FUNÇÃO: REINICIAR ÁUDIO ---
+  const handleRestart = () => {
+    if (audioRef.current) {
+      audioRef.current.currentTime = 0; // Volta o disco pro começo!
+      setIsPlaying(true); // Garante que vai tocar
+    }
+  };
+
   // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
   useEffect(() => {
-    // A função que será chamada quando alguém der um "grito" no sistema
     const handleModuleAction = (event: Event) => {
-      // Fazemos um cast (conversão) para entender os detalhes do evento
       const customEvent = event as CustomEvent;
       const { targetId, action } = customEvent.detail;
 
-      // Se o grito não for pra esse módulo, a gente ignora
       if (targetId !== moduleData.id) return;
 
-      // Se for pra nós, executamos a ação!
       if (action === 'play') {
         setIsPlaying(true);
-        // Se estiver minimizado, ele avisa o pai para abrir!
         if (moduleData.isMinimized) onUpdate(moduleData.id, { isMinimized: false });
       }
       if (action === 'pause') setIsPlaying(false);
       if (action === 'toggle') setIsPlaying(prev => !prev);
+      
+      // 👇 NOVO: Link de texto agora pode forçar o reinício do som!
+      if (action === 'restart') {
+        handleRestart();
+        if (moduleData.isMinimized) onUpdate(moduleData.id, { isMinimized: false });
+      }
     };
 
-    // Colocamos o módulo para ouvir a janela
     window.addEventListener('rpg-module-action', handleModuleAction);
-
-    // Quando o módulo for fechado, ele para de ouvir
-    return () => {
-      window.removeEventListener('rpg-module-action', handleModuleAction);
-    };
-  }, [moduleData.id]); 
-  // O array de dependências tem moduleData.id para garantir que ele ouça o ID correto
+    return () => window.removeEventListener('rpg-module-action', handleModuleAction);
+  }, [moduleData.id, moduleData.isMinimized, onUpdate]); 
 
   // Sincronização de Volume e Play/Pause
   useEffect(() => {
@@ -78,7 +81,6 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
     }
   };
 
-  // Nova função para escolher do cofre
   const selectFromVault = async () => {
     try {
       setIsLoading(true);
@@ -98,9 +100,9 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
   if (!moduleData.isActive) return null;
 
   return (
-    <div id={`module-${moduleData.id}`} className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
+    <div id={`module-${moduleData.id}`} className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-blue-500 focus-within:shadow-blue-900/20">
       
-      {/* CABEÇALHO (Sempre Visível) */}
+      {/* CABEÇALHO */}
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2 flex-1">
           <span className="text-blue-400">🎵</span>
@@ -120,7 +122,7 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
         </button>
       </div>
 
-      {/* PAINEL DE CONTROLES (Oculto ao minimizar) */}
+      {/* PAINEL DE CONTROLES */}
       {!moduleData.isMinimized && (
         <div className="p-4 flex flex-col gap-3">
           {isEditing && (
@@ -128,18 +130,10 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
               <div className="bg-slate-800/50 p-3 rounded border border-slate-700">
                 <label className="block text-xs font-bold text-slate-300 mb-2 uppercase tracking-wide">Cofre de Mídia</label>
                 <div className="flex gap-2">
-                  <button 
-                    onClick={importAudio} 
-                    className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-3 rounded shadow transition"
-                    title="Copia um arquivo do seu PC para o Echo Tabula"
-                  >
+                  <button onClick={importAudio} className="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white text-sm py-2 px-3 rounded shadow transition">
                     📥 Importar Novo (.mp3)
                   </button>
-                  <button 
-                    onClick={selectFromVault} 
-                    className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-sm py-2 px-3 rounded shadow transition border border-slate-600"
-                    title="Escolhe um áudio que já está salvo no seu cofre"
-                  >
+                  <button onClick={selectFromVault} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white text-sm py-2 px-3 rounded shadow transition border border-slate-600">
                     🗃️ Escolher do Cofre
                   </button>
                 </div>
@@ -177,24 +171,40 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
             </div>
           )}
 
-          <div className="flex items-center gap-4 bg-slate-900/50 p-2 rounded">
+          {/* 👇 NOVA ÁREA DE BOTÕES DE REPRODUÇÃO 👇 */}
+          <div className="flex items-center gap-2 bg-slate-900/50 p-2 rounded border border-slate-800 shadow-inner">
+            
+            {/* O NOVO BOTÃO DE REINICIAR (Voltar ao começo) */}
+            <button 
+              onClick={handleRestart}
+              disabled={!url}
+              className="w-10 h-10 rounded-full flex items-center justify-center text-lg transition flex-shrink-0 bg-slate-700 hover:bg-blue-600 text-white disabled:bg-slate-800 disabled:opacity-50 shadow"
+              title="Reiniciar áudio do zero"
+            >
+              ⏮
+            </button>
+
+            {/* O BOTÃO ORIGINAL DE PLAY / PAUSE */}
             <button 
               onClick={() => setIsPlaying(!isPlaying)}
               disabled={!url}
               className={`w-12 h-12 rounded-full flex items-center justify-center text-xl shadow-lg transition flex-shrink-0
                 ${isPlaying ? 'bg-amber-600 hover:bg-amber-500' : 'bg-emerald-600 hover:bg-emerald-500'} 
                 disabled:bg-slate-700 disabled:opacity-50`}
+              title={isPlaying ? "Pausar" : "Tocar"}
             >
               {isLoading && isPlaying ? '⏳' : isPlaying ? '⏸' : '▶'}
             </button>
-            <div className="flex-1 overflow-hidden">
+
+            <div className="flex-1 overflow-hidden pl-2">
               <p className="text-xs text-slate-400 truncate">{url ? url : 'Nenhuma mídia.'}</p>
             </div>
           </div>
+
         </div>
       )}
 
-      {/* MOTOR DE ÁUDIO (Sempre Montado) */}
+      {/* MOTOR DE ÁUDIO */}
       <div className="hidden">
         {url && (
           <audio 

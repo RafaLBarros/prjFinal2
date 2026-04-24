@@ -176,6 +176,7 @@ const MenuBar = ({ editor, allModules, currentModuleId }: { editor: Editor | nul
                   <option value="toggle">Tocar / Pausar (Alternar)</option>
                   <option value="play">Somente Tocar</option>
                   <option value="pause">Somente Pausar</option>
+                  <option value="restart">Reiniciar do Zero</option>
                 </select>
               </div>
             )}
