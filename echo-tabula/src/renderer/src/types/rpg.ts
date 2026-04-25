@@ -125,5 +125,6 @@ export interface CampaignNode {
   isOpen?: boolean;
   children?: CampaignNode[];
   isPinned?: boolean;
+  icon?: string;
   modules?: RpgModule[]; 
 }

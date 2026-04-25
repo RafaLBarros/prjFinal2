@@ -12,11 +12,20 @@ interface SidebarProps {
   onDeleteNode: (id: string) => void;
   onMoveNode: (draggedId: string, targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onRenameNode: (id: string, newName: string) => void;
-  onTogglePin: (id: string) => void; // 👈 NOVA FUNÇÃO PARA FIXAR
+  onTogglePin: (id: string) => void;
+  onChangeIcon: (id: string, icon: string) => void; // 👈 NOVA PROP AQUI
   level?: number; 
 }
 
-// --- FUNÇÃO AUXILIAR: Encontrar todas as cenas fixadas ---
+// Uma paleta curada de ícones úteis para RPG
+const RPG_EMOJIS = [
+  '📁', '📂', '📜', '📖', '🗺️', '⚔️', 
+  '🛡️', '🧙‍♂️', '🧝‍♀️', '🧛', '🧟', '🐉', 
+  '🏰', '🏕️', '🍻', '🔥', '💀', '👽', 
+  '🤖', '👑', '💎', '🪙', '🩸', '💊', 
+  '🔧', '🎲', '🧩', '🎵', '🌲', '🌊'
+];
+
 const getPinnedScenes = (nodes: CampaignNode[]): CampaignNode[] => {
   let pinned: CampaignNode[] = [];
   for (const node of nodes) {
@@ -31,11 +40,14 @@ const getPinnedScenes = (nodes: CampaignNode[]): CampaignNode[] => {
 };
 
 function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps }) {
-  const { activeSceneId, onSelectScene, onToggleFolder, onAddNode, onDeleteNode, onMoveNode, onRenameNode, onTogglePin, level = 0 } = props;
+  const { activeSceneId, onSelectScene, onToggleFolder, onAddNode, onDeleteNode, onMoveNode, onRenameNode, onTogglePin, onChangeIcon, level = 0 } = props;
   
   const [isEditing, setIsEditing] = useState(false);
   const [editName, setEditName] = useState(node.name);
   const [dragPosition, setDragPosition] = useState<'before' | 'after' | 'inside' | null>(null);
+  
+  // 👈 Controle do Modal de Emoji
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false); 
 
   const handleSaveRename = () => {
     setIsEditing(false);
@@ -108,8 +120,18 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
         onDoubleClick={() => setIsEditing(true)}
       >
         <div className="flex items-center gap-2 truncate overflow-hidden w-full">
-          <span className="text-sm opacity-80 pointer-events-none shrink-0">
-            {node.type === 'folder' ? (node.isOpen ? '📂' : '📁') : '📜'}
+          
+          {/* 👇 ÍCONE CLICÁVEL 👇 */}
+          <span 
+            className={`text-sm shrink-0 transition-transform ${!isEditing ? 'cursor-pointer hover:scale-125 hover:drop-shadow-md' : 'pointer-events-none opacity-80'}`}
+            onClick={(e) => {
+              if (isEditing) return;
+              e.stopPropagation();
+              setShowEmojiPicker(true);
+            }}
+            title="Alterar Ícone"
+          >
+            {node.icon ? node.icon : (node.type === 'folder' ? (node.isOpen ? '📂' : '📁') : '📜')}
           </span>
           
           {isEditing ? (
@@ -126,8 +148,6 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
 
         {!isEditing && (
           <div className="hidden group-hover:flex items-center gap-1 shrink-0">
-            
-            {/* 👇 BOTÃO DE FIXAR CENA AQUI 👇 */}
             {node.type === 'scene' && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onTogglePin(node.id); }} 
@@ -149,6 +169,40 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
         )}
       </div>
 
+      {/* 👇 MODAL FLUTUANTE DE EMOJIS 👇 */}
+      {showEmojiPicker && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
+          onClick={(e) => { e.stopPropagation(); setShowEmojiPicker(false); }}
+        >
+          <div 
+            className="bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] w-72 flex flex-col gap-3 animate-in fade-in zoom-in-95"
+            onClick={e => e.stopPropagation()} // Previne fechar ao clicar dentro
+          >
+            <h4 className="text-sm font-bold text-slate-300 border-b border-slate-700 pb-2">Escolha um Ícone</h4>
+            <div className="grid grid-cols-6 gap-1">
+              {RPG_EMOJIS.map(emoji => (
+                <button 
+                  key={emoji} 
+                  onClick={() => { onChangeIcon(node.id, emoji); setShowEmojiPicker(false); }} 
+                  className="hover:bg-slate-700 hover:scale-110 p-1.5 rounded text-xl transition-all flex items-center justify-center"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+            <div className="border-t border-slate-700 pt-2 flex justify-end">
+              <button 
+                onClick={() => { onChangeIcon(node.id, ''); setShowEmojiPicker(false); }} 
+                className="text-xs text-slate-400 hover:text-red-400 transition-colors"
+              >
+                Remover Ícone (Padrão)
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {node.type === 'folder' && node.isOpen && node.children && (
         <Sidebar {...props} nodes={node.children} level={level + 1} />
       )}
@@ -159,13 +213,11 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
 export function Sidebar(props: SidebarProps) {
   const isRoot = props.level === undefined || props.level === 0;
   
-  // Se for a raiz, extraímos as cenas fixadas!
   const pinnedScenes = isRoot ? getPinnedScenes(props.nodes) : [];
 
   return (
     <div className={`w-full flex flex-col gap-[2px] ${isRoot ? 'h-full' : ''}`}>
       
-      {/* 👇 1. SESSÃO DE CENAS FIXADAS (SÓ APARECE NA RAIZ) 👇 */}
       {isRoot && pinnedScenes.length > 0 && (
         <div className="mb-4">
           <div className="text-[10px] font-bold text-amber-500/70 uppercase tracking-wider mb-1 px-2 flex items-center gap-2">
@@ -181,7 +233,8 @@ export function Sidebar(props: SidebarProps) {
                 }`}
               >
                 <div className="flex items-center gap-2 truncate">
-                  <span className="text-sm shrink-0">📌</span>
+                  {/* 👇 REFLETE O ÍCONE CUSTOMIZADO AQUI TAMBÉM 👇 */}
+                  <span className="text-sm shrink-0">{scene.icon || '📌'}</span>
                   <span className="text-sm truncate">{scene.name}</span>
                 </div>
                 <button 
@@ -194,19 +247,16 @@ export function Sidebar(props: SidebarProps) {
               </div>
             ))}
           </div>
-          {/* Linha divisória */}
           <div className="h-px bg-slate-700/50 mx-2 mt-3 mb-1" />
         </div>
       )}
 
-      {/* 2. A ÁRVORE PRINCIPAL DE PASTAS E CENAS */}
       <div className="flex flex-col gap-[2px]">
         {props.nodes.map((node) => (
           <SidebarNode key={node.id} node={node} props={props} />
         ))}
       </div>
 
-      {/* 3. A VERSÃO */}
       {isRoot && (
         <div className="mt-auto pb-2 pt-10 w-full flex justify-center">
           <span className="text-[10px] text-slate-500/50 font-mono font-bold select-none pointer-events-none">

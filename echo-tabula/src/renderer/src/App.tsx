@@ -452,6 +452,22 @@ export default function App() {
     }
   };
 
+  // 👇 NOVA FUNÇÃO PARA TROCAR O ÍCONE 👇
+  const handleChangeNodeIcon = (targetId: string, newIcon: string) => {
+    const updateIconInTree = (nodes: CampaignNode[]): CampaignNode[] => {
+      return nodes.map(node => {
+        if (node.id === targetId) {
+          return { ...node, icon: newIcon };
+        }
+        if (node.children) {
+          return { ...node, children: updateIconInTree(node.children) };
+        }
+        return node;
+      });
+    };
+    setTree(updateIconInTree(tree));
+  };
+
 
   return (
     <div className="flex h-screen w-full bg-slate-950 text-slate-200 overflow-hidden font-sans">
@@ -517,7 +533,7 @@ export default function App() {
               >
                 📤 Exportar
               </button>
-              
+
             </div>
           )}
         </div>
@@ -541,6 +557,7 @@ export default function App() {
             onMoveNode={handleMoveNode}
             onRenameNode={handleRenameNode}
             onTogglePin={handleTogglePin} // 👇 AQUI ESTÁ A CONEXÃO 👇
+            onChangeIcon={handleChangeNodeIcon}
           />
         </div>
       </div>

@@ -7,7 +7,6 @@ import { autoUpdater } from 'electron-updater'
 import log from "electron-log/main"
 import icon from '../../resources/icon.png?asset'
 import fs from 'fs/promises'
-import path from 'path';
 import AdmZip from 'adm-zip';
 
 // 1. ELEVAÇÃO DE PRIVILÉGIOS (Apenas o protocolo local do cofre)
