@@ -2,6 +2,7 @@
 import { useState } from 'react';
 import { CampaignNode } from '../types/rpg';
 import packageJson from '../../../../package.json';
+import EmojiPicker, { Theme } from 'emoji-picker-react';
 
 interface SidebarProps {
   nodes: CampaignNode[];
@@ -16,15 +17,6 @@ interface SidebarProps {
   onChangeIcon: (id: string, icon: string) => void; // 👈 NOVA PROP AQUI
   level?: number; 
 }
-
-// Uma paleta curada de ícones úteis para RPG
-const RPG_EMOJIS = [
-  '📁', '📂', '📜', '📖', '🗺️', '⚔️', 
-  '🛡️', '🧙‍♂️', '🧝‍♀️', '🧛', '🧟', '🐉', 
-  '🏰', '🏕️', '🍻', '🔥', '💀', '👽', 
-  '🤖', '👑', '💎', '🪙', '🩸', '💊', 
-  '🔧', '🎲', '🧩', '🎵', '🌲', '🌊'
-];
 
 const getPinnedScenes = (nodes: CampaignNode[]): CampaignNode[] => {
   let pinned: CampaignNode[] = [];
@@ -169,34 +161,34 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
         )}
       </div>
 
-      {/* 👇 MODAL FLUTUANTE DE EMOJIS 👇 */}
+      {/* 👇 MODAL COM O MOTOR DE EMOJIS PROFISSIONAL 👇 */}
       {showEmojiPicker && (
         <div 
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
           onClick={(e) => { e.stopPropagation(); setShowEmojiPicker(false); }}
         >
           <div 
-            className="bg-slate-900 border border-slate-700 p-4 rounded-xl shadow-[0_10px_40px_rgba(0,0,0,0.5)] w-72 flex flex-col gap-3 animate-in fade-in zoom-in-95"
-            onClick={e => e.stopPropagation()} // Previne fechar ao clicar dentro
+            className="flex flex-col items-center animate-in fade-in zoom-in-95 shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
+            onClick={e => e.stopPropagation()} 
           >
-            <h4 className="text-sm font-bold text-slate-300 border-b border-slate-700 pb-2">Escolha um Ícone</h4>
-            <div className="grid grid-cols-6 gap-1">
-              {RPG_EMOJIS.map(emoji => (
-                <button 
-                  key={emoji} 
-                  onClick={() => { onChangeIcon(node.id, emoji); setShowEmojiPicker(false); }} 
-                  className="hover:bg-slate-700 hover:scale-110 p-1.5 rounded text-xl transition-all flex items-center justify-center"
-                >
-                  {emoji}
-                </button>
-              ))}
-            </div>
-            <div className="border-t border-slate-700 pt-2 flex justify-end">
+            {/* O Componente Mágico da Biblioteca */}
+            <EmojiPicker 
+              theme={Theme.DARK} // Já deixamos no Dark Mode combinando com o Echo Tabula
+              searchPlaceHolder="Buscar ícone..."
+              lazyLoadEmojis={true}
+              onEmojiClick={(emojiObject) => {
+                onChangeIcon(node.id, emojiObject.emoji);
+                setShowEmojiPicker(false);
+              }}
+            />
+            
+            {/* O Botão de Remover fica isolado numa barrinha embaixo */}
+            <div className="mt-2 bg-slate-900 px-4 py-2 rounded-lg border border-slate-700 w-full flex justify-center hover:border-red-500/50 transition-colors">
               <button 
                 onClick={() => { onChangeIcon(node.id, ''); setShowEmojiPicker(false); }} 
-                className="text-xs text-slate-400 hover:text-red-400 transition-colors"
+                className="text-sm font-medium text-slate-400 hover:text-red-400 transition-colors"
               >
-                Remover Ícone (Padrão)
+                Remover Ícone (Restaurar Padrão)
               </button>
             </div>
           </div>
