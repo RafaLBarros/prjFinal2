@@ -133,106 +133,128 @@ return (
             <p className="text-sm mt-2">Adicione seu primeiro módulo usando os botões abaixo.</p>
           </div>
         ) : (
-          modules.map(mod => (
-            <div 
-              key={mod.id} 
-              draggable={draggableModuleId === mod.id}
-              onDragStart={(e) => {
-                e.stopPropagation();
-                e.dataTransfer.setData('moduleId', mod.id);
-              }}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-
-                handleAutoScroll(e.clientY);
-
-                const rect = e.currentTarget.getBoundingClientRect();
-                const y = e.clientY - rect.top;
-                if (y < rect.height / 2) {
-                  setDropPosition('before');
-                } else {
-                  setDropPosition('after');
-                }
-                setDropTargetId(mod.id);
-              }}
-              onDragLeave={() => {
-                setDropTargetId(null);
-                setDropPosition(null);
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const draggedId = e.dataTransfer.getData('moduleId');
-                if (draggedId && draggedId !== mod.id && dropPosition) {
-                  handleReorderModules(draggedId, mod.id, dropPosition);
-                }
-                setDropTargetId(null);
-                setDropPosition(null);
-                setDraggableModuleId(null);
-              }}
-              // 1. A MÁGICA DO FLEXBOX: Coloca a alça e o módulo lado a lado (gap-2)
-              className={`flex items-start gap-2 group transition-all duration-300 rounded-lg ${
-                dropTargetId === mod.id && dropPosition === 'before' ? 'shadow-[0_-4px_0_0_#10b981] mt-4' : ''
-              } ${
-                dropTargetId === mod.id && dropPosition === 'after' ? 'shadow-[0_4px_0_0_#10b981] mb-4' : ''
-              }`}
-            >
-              
-              {/* --- A ALÇA DE ARRASTAR (GRIP) ATUALIZADA (6 PONTOS) --- */}
-              {/* Mantemos o container Flexbox externo, mas mudamos o interno */}
-              <div 
-                onMouseEnter={() => setDraggableModuleId(mod.id)}
-                onMouseLeave={() => setDraggableModuleId(null)}
-                // Centralizamos a alça verticalmente e damos o respiro no topo (pt-5)
-                className="flex items-start pt-5 w-6 shrink-0 opacity-30 group-hover:opacity-100 cursor-grab active:cursor-grabbing text-slate-400 hover:text-emerald-400 transition-opacity"
-                title="Segure para reordenar"
-              >
-                {/* A MÁGICA DO GRID: 2 colunas, 3 linhas automáticas e gap de 3px */}
-                <div className="grid grid-cols-2 gap-[3px] pointer-events-none">
-                  {/* Linha 1 */}
-                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                  {/* Linha 2 */}
-                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                  {/* Linha 3 */}
-                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
-                  <div className="w-1.5 h-1.5 bg-current rounded-full" />
+          modules.map(mod => {
+            
+            // 👇 SEÇÃO 1: O MÓDULO FANTASMA 👇
+            if (mod.isFloated) {
+              return (
+                <div key={mod.id} className="border-2 border-dashed border-slate-700 bg-slate-900/30 p-6 rounded-lg flex flex-col items-center justify-center gap-3 animate-in fade-in transition-all hover:border-emerald-500/50 group shadow-inner">
+                  <span className="text-3xl opacity-40 group-hover:opacity-100 transition-opacity group-hover:animate-bounce">👻</span>
+                  <p className="text-slate-400 text-sm font-medium">
+                    A janela <strong className="text-emerald-400">{mod.name}</strong> está desencaixada.
+                  </p>
+                  <button 
+                    onClick={() => handleUpdateModule(mod.id, { isFloated: false })}
+                    className="px-4 py-2 bg-slate-800 border border-slate-600 hover:bg-emerald-600 hover:border-emerald-500 text-slate-300 hover:text-white rounded shadow transition-colors text-xs font-bold uppercase tracking-wider mt-2"
+                  >
+                    📥 Devolver para a Cena
+                  </button>
                 </div>
-              </div>
+              );
+            }
 
-              {/* --- O MÓDULO E O BOTÃO DE EXCLUIR --- */}
-              {/* 3. flex-1 faz o módulo ocupar o resto da tela em segurança */}
-              <div className="flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md z-10 hover:z-30 focus-within:z-[60]">
-                
-                {/* 👇 O TextModule COM AS NOVAS PROPRIEDADES PLUGADAS 👇 */}
-                {mod.type === 'text' && (
-                  <TextModule 
-                    moduleData={mod as TextType} 
-                    allModules={modules} 
-                    campaignNodes={campaignNodes} 
-                    currentSceneId={scene.id} 
-                    onUpdate={handleUpdateModule} 
-                  />
-                )}
-                
-                {mod.type === 'audio' && <AudioModule moduleData={mod as AudioType} onUpdate={handleUpdateModule} />}
-                {mod.type === 'pdf_crop' && <PdfModule moduleData={mod as PdfType} onUpdate={handleUpdateModule} />}
-                {mod.type === 'encounter' && <EncounterModule moduleData={mod as EncounterType} onUpdate={handleUpdateModule} />}
-                {mod.type === 'dice_roller' && <DiceRollerModule moduleData={mod as DiceRollerType} onUpdate={handleUpdateModule} />}
+            // 👇 SEÇÃO 2: O MÓDULO NORMAL (COM BOTÃO DE DESENCAIXAR) 👇
+            return (
+              <div 
+                key={mod.id} 
+                draggable={draggableModuleId === mod.id}
+                onDragStart={(e) => {
+                  e.stopPropagation();
+                  e.dataTransfer.setData('moduleId', mod.id);
+                }}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
 
-                <button 
-                  onClick={() => handleDeleteModule(mod.id)}
-                  className="absolute -top-3 -right-3 bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 group-hover:scale-100 flex items-center justify-center font-bold z-10"
-                  title="Remover Módulo"
+                  handleAutoScroll(e.clientY);
+
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const y = e.clientY - rect.top;
+                  if (y < rect.height / 2) {
+                    setDropPosition('before');
+                  } else {
+                    setDropPosition('after');
+                  }
+                  setDropTargetId(mod.id);
+                }}
+                onDragLeave={() => {
+                  setDropTargetId(null);
+                  setDropPosition(null);
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const draggedId = e.dataTransfer.getData('moduleId');
+                  if (draggedId && draggedId !== mod.id && dropPosition) {
+                    handleReorderModules(draggedId, mod.id, dropPosition);
+                  }
+                  setDropTargetId(null);
+                  setDropPosition(null);
+                  setDraggableModuleId(null);
+                }}
+                className={`flex items-start gap-2 group transition-all duration-300 rounded-lg ${
+                  dropTargetId === mod.id && dropPosition === 'before' ? 'shadow-[0_-4px_0_0_#10b981] mt-4' : ''
+                } ${
+                  dropTargetId === mod.id && dropPosition === 'after' ? 'shadow-[0_4px_0_0_#10b981] mb-4' : ''
+                }`}
+              >
+                
+                {/* --- A ALÇA DE ARRASTAR (GRIP) --- */}
+                <div 
+                  onMouseEnter={() => setDraggableModuleId(mod.id)}
+                  onMouseLeave={() => setDraggableModuleId(null)}
+                  className="flex items-start pt-5 w-6 shrink-0 opacity-30 group-hover:opacity-100 cursor-grab active:cursor-grabbing text-slate-400 hover:text-emerald-400 transition-opacity"
+                  title="Segure para reordenar"
                 >
-                  ✕
-                </button>
-              </div>
+                  <div className="grid grid-cols-2 gap-[3px] pointer-events-none">
+                    <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                    <div className="w-1.5 h-1.5 bg-current rounded-full" />
+                  </div>
+                </div>
 
-            </div>
-          ))
+                {/* --- O MÓDULO E OS BOTÕES NO TOPO --- */}
+                <div className="flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md z-10 hover:z-30 focus-within:z-[60]">
+                  
+                  {mod.type === 'text' && (
+                    <TextModule 
+                      moduleData={mod as TextType} 
+                      allModules={modules} 
+                      campaignNodes={campaignNodes} 
+                      currentSceneId={scene.id} 
+                      onUpdate={handleUpdateModule} 
+                    />
+                  )}
+                  {mod.type === 'audio' && <AudioModule moduleData={mod as AudioType} onUpdate={handleUpdateModule} />}
+                  {mod.type === 'pdf_crop' && <PdfModule moduleData={mod as PdfType} onUpdate={handleUpdateModule} />}
+                  {mod.type === 'encounter' && <EncounterModule moduleData={mod as EncounterType} onUpdate={handleUpdateModule} />}
+                  {mod.type === 'dice_roller' && <DiceRollerModule moduleData={mod as DiceRollerType} onUpdate={handleUpdateModule} />}
+
+                  {/* NOVO: Botão Desencaixar (Pop-up) */}
+                  <button 
+                    onClick={() => handleUpdateModule(mod.id, { isFloated: true })}
+                    className="absolute -top-3 right-8 bg-slate-700 hover:bg-blue-500 text-white w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 group-hover:scale-100 flex items-center justify-center font-bold z-10 border-2 border-slate-800"
+                    title="Desencaixar Janela (Pop-up Flutuante)"
+                  >
+                    🗗
+                  </button>
+
+                  {/* Botão Remover Original */}
+                  <button 
+                    onClick={() => handleDeleteModule(mod.id)}
+                    className="absolute -top-3 -right-3 bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 group-hover:scale-100 flex items-center justify-center font-bold z-10 border-2 border-slate-800"
+                    title="Remover Módulo"
+                  >
+                    ✕
+                  </button>
+                </div>
+
+              </div>
+            );
+          })
         )}
       </div>
 

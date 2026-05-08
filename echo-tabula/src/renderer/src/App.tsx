@@ -1,9 +1,12 @@
 // src/renderer/src/App.tsx
 import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
-import { CampaignNode } from './types/rpg';
+// 👇 CORREÇÃO 1: Adicionado o RpgModule na importação 👇
+import { CampaignNode, RpgModule } from './types/rpg';
 import { SceneManager } from './components/SceneManager';
 import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
+// 👇 CORREÇÃO 2: Importação do nosso novo gerenciador de janelas 👇
+import { FloatingModuleManager } from './components/FloatingModuleManager';
 
 export default function App() {
   
@@ -280,7 +283,6 @@ export default function App() {
     setTree(renameInTree(tree));
   };
 
-  // 👇 NOVA FUNÇÃO: FIXAR / DESAFIXAR CENA 👇
   const handleTogglePin = (targetId: string) => {
     const togglePinInTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
@@ -452,7 +454,6 @@ export default function App() {
     }
   };
 
-  // 👇 NOVA FUNÇÃO PARA TROCAR O ÍCONE 👇
   const handleChangeNodeIcon = (targetId: string, newIcon: string) => {
     const updateIconInTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
@@ -466,6 +467,27 @@ export default function App() {
       });
     };
     setTree(updateIconInTree(tree));
+  };
+
+  // 👇 CORREÇÃO 3: Função Global usando o setTree correto! 👇
+  const handleUpdateModuleGlobal = (sceneId: string, moduleId: string, updatedFields: Partial<RpgModule>) => {
+    setTree(prevNodes => {
+      const newTree = JSON.parse(JSON.stringify(prevNodes)); // Cópia segura da árvore
+      
+      const updateNode = (nodes: CampaignNode[]) => {
+        for (let node of nodes) {
+          if (node.id === sceneId && node.type === 'scene' && node.modules) {
+            node.modules = node.modules.map(m => m.id === moduleId ? ({ ...m, ...updatedFields } as RpgModule) : m);
+            return true; // Achou e atualizou! Para a busca.
+          }
+          if (node.children && updateNode(node.children)) return true;
+        }
+        return false;
+      };
+      
+      updateNode(newTree);
+      return newTree;
+    });
   };
 
 
@@ -483,7 +505,6 @@ export default function App() {
               {saveStatus === 'saved' && <span className="text-[10px] text-slate-500 font-medium">Salvo</span>}
               {isProcessingIO && <span className="text-[10px] text-blue-400 animate-pulse font-medium">Processando...</span>}
               
-              {/* O NOVO BOTÃO DE IMPORTAR */}
               <button onClick={handleImportCampaign} disabled={isProcessingIO} className="text-slate-400 hover:text-blue-400 transition-colors text-lg disabled:opacity-50" title="Importar Pacote (.tabula)">
                 📥
               </button>
@@ -524,7 +545,6 @@ export default function App() {
                 + Cena
               </button>
 
-              {/* 👇 O NOVO BOTÃO DE EXPORTAR 👇 */}
               <button 
                 onClick={handleExportCampaign} 
                 disabled={isProcessingIO}
@@ -556,7 +576,7 @@ export default function App() {
             onDeleteNode={handleDeleteNode}
             onMoveNode={handleMoveNode}
             onRenameNode={handleRenameNode}
-            onTogglePin={handleTogglePin} // 👇 AQUI ESTÁ A CONEXÃO 👇
+            onTogglePin={handleTogglePin} 
             onChangeIcon={handleChangeNodeIcon}
           />
         </div>
@@ -567,7 +587,7 @@ export default function App() {
         {activeScene ? (
           <SceneManager 
             scene={activeScene} 
-            campaignNodes={tree} // <-- TEM QUE TER ISSO AQUI
+            campaignNodes={tree} 
             onUpdateModules={handleUpdateSceneModules}
             onRenameScene={handleRenameNode}
           />
@@ -683,6 +703,13 @@ export default function App() {
           </div>
         </div>
       )}
+
+      {/* 👇 CORREÇÃO 4: A nossa central de janelas flutuantes foi plugada aqui! 👇 */}
+      <FloatingModuleManager 
+        tree={tree} 
+        onUpdateModuleGlobal={handleUpdateModuleGlobal} 
+      />
+
       {/* O MINI-PLAYER DO SPOTIFY FICA AQUI */}
       <GlobalAudioPlayer />
 
