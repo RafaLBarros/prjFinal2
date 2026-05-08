@@ -25,10 +25,12 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
   const [linkLabel, setLinkLabel] = useState('');
   const [linkPayload, setLinkPayload] = useState<{ bookmarkId?: string, presetId?: string } | null>(null);
   const [linkAction, setLinkAction] = useState('toggle');
+  
+  // 👇 NOVO ESTADO PARA O ÍCONE DA CORRENTE 👇
+  const [linkIcon, setLinkIcon] = useState('🔗');
 
-  const menuRef = useRef<HTMLDivElement>(null); // 👈 Referência para o clique fora
+  const menuRef = useRef<HTMLDivElement>(null); 
 
-  // Atualiza o editor
   useEffect(() => {
     if (!editor) return;
     const handleTransaction = () => forceUpdate({});
@@ -38,12 +40,10 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
     };
   }, [editor]);
 
-  // Se o menu for aberto, reseta a cena alvo para a atual
   useEffect(() => {
     if (showLinkMenu) setSelectedSceneId(currentSceneId);
   }, [showLinkMenu, currentSceneId]);
 
-  // 👈 NOVO: Fecha o menu se clicar em qualquer lugar fora dele
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -108,8 +108,10 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
 
   const selectedModule = availableModules.find(m => m.id === linkTargetId);
 
+  // Paleta de Ícones Rápidos
+  const QUICK_ICONS = ['🔗', '⚡', '🎵', '⚔️', '🎲', '📕', '👁️', '💬', '🎒', '🔥'];
+
   return (
-    // 👈 NOVO: Se o menu estiver aberto, esta barra tem prioridade máxima (z-50)
     <div className={`flex flex-wrap gap-1 p-1 border-b border-slate-700 bg-slate-900/50 relative transition-all ${showLinkMenu ? 'z-50' : 'z-10'}`}>
       <MenuButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} title="Negrito (Ctrl+B)" icon="B" />
       <MenuButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')} title="Itálico (Ctrl+I)" icon="I" />
@@ -124,7 +126,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
       <MenuButton onClick={handleAddImage} isActive={editor.isActive('image')} title="Inserir Imagem" icon="🖼️" />
       <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> 
 
-      {/* 👈 NOVO: O menu agora é ancorado a esta ref para sabermos se você clicou fora dele */}
       <div className="relative" ref={menuRef}>
         <MenuButton 
           onClick={() => setShowLinkMenu(!showLinkMenu)} 
@@ -239,15 +240,33 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               </div>
             )}
 
-            <div className="flex flex-col gap-1">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Texto do Botão:</label>
-              <input 
-                type="text"
-                placeholder="Ex: Abrir Bestiário"
-                value={linkLabel}
-                onChange={(e) => setLinkLabel(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500"
-              />
+            {/* 👇 NOVA SEÇÃO DE ÍCONE E TEXTO 👇 */}
+            <div className="flex flex-col gap-2 bg-slate-950 p-2 rounded border border-slate-700">
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Ícone:</label>
+                <div className="flex flex-wrap gap-1">
+                  {QUICK_ICONS.map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={() => setLinkIcon(emoji)}
+                      className={`w-6 h-6 flex items-center justify-center rounded text-xs transition-colors ${linkIcon === emoji ? 'bg-emerald-600 text-white shadow-inner' : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200 border border-slate-700'}`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              
+              <div>
+                <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Texto do Botão:</label>
+                <input 
+                  type="text"
+                  placeholder="Ex: Rolar Percepção"
+                  value={linkLabel}
+                  onChange={(e) => setLinkLabel(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-emerald-500"
+                />
+              </div>
             </div>
 
             <div className="flex gap-2 mt-2 pt-2 border-t border-slate-700">
@@ -279,7 +298,8 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
                       targetId: linkTargetId, 
                       action: actionCommand, 
                       label: linkLabel,
-                      payload: JSON.stringify(finalPayload)
+                      payload: JSON.stringify(finalPayload),
+                      icon: linkIcon // 👈 MANDAMOS O ÍCONE PARA O TIPTAP SALVAR!
                     }
                   }).run();
 
@@ -287,6 +307,7 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
                   setLinkLabel('');
                   setLinkTargetId('');
                   setLinkPayload(null);
+                  setLinkIcon('🔗'); // 👈 Reseta para o padrão
                 }}
                 disabled={!linkTargetId || !linkLabel || 
                   (selectedModule?.type === 'pdf_crop' && !linkPayload?.bookmarkId) ||
