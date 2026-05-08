@@ -204,7 +204,7 @@ return (
 
               {/* --- O MÓDULO E O BOTÃO DE EXCLUIR --- */}
               {/* 3. flex-1 faz o módulo ocupar o resto da tela em segurança */}
-              <div className="flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md z-10 hover:z-50 focus-within:z-50">
+              <div className="flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md z-10 hover:z-30 focus-within:z-[60]">
                 
                 {/* 👇 O TextModule COM AS NOVAS PROPRIEDADES PLUGADAS 👇 */}
                 {mod.type === 'text' && (

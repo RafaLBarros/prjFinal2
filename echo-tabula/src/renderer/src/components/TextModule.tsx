@@ -1,5 +1,5 @@
 // src/renderer/src/components/TextModule.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { TextModule as TextModuleType, RpgModule, CampaignNode } from '../types/rpg';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
@@ -20,12 +20,15 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
   const [, forceUpdate] = useState({});
   
   const [showLinkMenu, setShowLinkMenu] = useState(false);
-  const [selectedSceneId, setSelectedSceneId] = useState<string>(currentSceneId); // Cena Alvo
-  const [linkTargetId, setLinkTargetId] = useState(''); // Módulo Alvo
+  const [selectedSceneId, setSelectedSceneId] = useState<string>(currentSceneId);
+  const [linkTargetId, setLinkTargetId] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
   const [linkPayload, setLinkPayload] = useState<{ bookmarkId?: string, presetId?: string } | null>(null);
   const [linkAction, setLinkAction] = useState('toggle');
 
+  const menuRef = useRef<HTMLDivElement>(null); // 👈 Referência para o clique fora
+
+  // Atualiza o editor
   useEffect(() => {
     if (!editor) return;
     const handleTransaction = () => forceUpdate({});
@@ -39,6 +42,17 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
   useEffect(() => {
     if (showLinkMenu) setSelectedSceneId(currentSceneId);
   }, [showLinkMenu, currentSceneId]);
+
+  // 👈 NOVO: Fecha o menu se clicar em qualquer lugar fora dele
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowLinkMenu(false);
+      }
+    };
+    if (showLinkMenu) document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showLinkMenu]);
 
   if (!editor) return null;
 
@@ -70,9 +84,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
     }
   };
 
-  // 👇 NOVA LÓGICA DE BUSCA HIERÁRQUICA (Cenas -> Módulos) 👇
-  
-  // 1. Vasculha a árvore inteira e extrai todas as Cenas e seus caminhos de pasta
   const getScenes = (nodes: CampaignNode[], path = ''): any[] => {
     let scenes: any[] = [];
     nodes.forEach(node => {
@@ -88,20 +99,18 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
   const allScenes = getScenes(campaignNodes);
   const activeTargetScene = allScenes.find(s => s.id === selectedSceneId);
   
-  // 2. Filtra os módulos com base na cena escolhida
   let availableModules: RpgModule[] = [];
   if (selectedSceneId === currentSceneId) {
-    // Se for a cena atual, usamos os módulos fresquinhos e excluímos nós mesmos
     availableModules = allModules.filter(m => m.id !== currentModuleId);
   } else if (activeTargetScene) {
-    // Se for outra cena, pegamos da árvore
     availableModules = activeTargetScene.modules;
   }
 
   const selectedModule = availableModules.find(m => m.id === linkTargetId);
 
   return (
-    <div className="flex flex-wrap gap-1 p-1 border-b border-slate-700 bg-slate-900/50 relative">
+    // 👈 NOVO: Se o menu estiver aberto, esta barra tem prioridade máxima (z-50)
+    <div className={`flex flex-wrap gap-1 p-1 border-b border-slate-700 bg-slate-900/50 relative transition-all ${showLinkMenu ? 'z-50' : 'z-10'}`}>
       <MenuButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} title="Negrito (Ctrl+B)" icon="B" />
       <MenuButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')} title="Itálico (Ctrl+I)" icon="I" />
       <MenuButton onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')} title="Tachado" icon="S" />
@@ -115,7 +124,8 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
       <MenuButton onClick={handleAddImage} isActive={editor.isActive('image')} title="Inserir Imagem" icon="🖼️" />
       <div className="w-px h-6 bg-slate-700 mx-1 self-center" /> 
 
-      <div className="relative">
+      {/* 👈 NOVO: O menu agora é ancorado a esta ref para sabermos se você clicou fora dele */}
+      <div className="relative" ref={menuRef}>
         <MenuButton 
           onClick={() => setShowLinkMenu(!showLinkMenu)} 
           isActive={showLinkMenu} 
@@ -124,9 +134,8 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
         />
 
         {showLinkMenu && (
-          <div className="absolute top-full mt-2 left-0 w-80 bg-slate-800 border border-slate-600 shadow-[0_10px_40px_rgba(0,0,0,0.8)] rounded-md p-4 z-50 flex flex-col gap-3">
+          <div className="absolute top-full mt-2 left-0 w-80 bg-slate-800 border border-slate-600 shadow-[0_15px_50px_rgba(0,0,0,0.8)] rounded-md p-4 z-[100] flex flex-col gap-3">
             
-            {/* 1. SELEÇÃO DA CENA (Hierarquia Pai) */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                 <span>📍</span> Cena Alvo:
@@ -135,11 +144,11 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
                 value={selectedSceneId} 
                 onChange={(e) => {
                   setSelectedSceneId(e.target.value);
-                  setLinkTargetId(''); // Reseta o módulo quando troca de cena
+                  setLinkTargetId(''); 
                   setLinkPayload(null);
                   setLinkAction('toggle');
                 }}
-                className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500 cursor-pointer"
               >
                 {allScenes.map(scene => (
                   <option key={scene.id} value={scene.id}>
@@ -149,7 +158,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               </select>
             </div>
 
-            {/* 2. SELEÇÃO DO MÓDULO (Hierarquia Filho) */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1">
                 <span>🧩</span> Módulo Alvo:
@@ -161,7 +169,7 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
                   setLinkPayload(null);
                   setLinkAction('toggle');
                 }}
-                className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500"
+                className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500 cursor-pointer"
               >
                 <option value="" disabled>
                   {availableModules.length > 0 ? "Selecione um módulo..." : "Nenhum módulo nesta cena."}
@@ -183,14 +191,13 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               </select>
             </div>
 
-            {/* SUB-MENU CONDICIONAL: PDF */}
             {selectedModule?.type === 'pdf_crop' && (
               <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-red-500">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marca-Página:</label>
                 <select 
                   value={linkPayload?.bookmarkId || ''} 
                   onChange={(e) => setLinkPayload({ bookmarkId: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-red-500"
+                  className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-red-500 cursor-pointer"
                 >
                   <option value="" disabled>Selecione um atalho do livro...</option>
                   {selectedModule.data.bookmarks?.map((b: any) => (
@@ -200,14 +207,13 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               </div>
             )}
 
-            {/* SUB-MENU CONDICIONAL: DADOS */}
             {selectedModule?.type === 'dice_roller' && (
               <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-indigo-500">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ataque/Rolagem:</label>
                 <select 
                   value={linkPayload?.presetId || ''} 
                   onChange={(e) => setLinkPayload({ presetId: e.target.value })}
-                  className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-indigo-500"
+                  className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-indigo-500 cursor-pointer"
                 >
                   <option value="" disabled>Selecione um preset salvo...</option>
                   {selectedModule.data.presets?.map((p: any) => (
@@ -217,14 +223,13 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               </div>
             )}
 
-            {/* SUB-MENU CONDICIONAL: ÁUDIO */}
             {selectedModule?.type === 'audio' && (
               <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-blue-500">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ação do Áudio:</label>
                 <select 
                   value={linkAction} 
                   onChange={(e) => setLinkAction(e.target.value)}
-                  className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-blue-500"
+                  className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-blue-500 cursor-pointer"
                 >
                   <option value="toggle">Tocar / Pausar (Alternar)</option>
                   <option value="play">Somente Tocar</option>
@@ -234,7 +239,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               </div>
             )}
 
-            {/* 3. NOME DO BOTÃO */}
             <div className="flex flex-col gap-1">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Texto do Botão:</label>
               <input 
@@ -246,7 +250,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               />
             </div>
 
-            {/* BOTÕES DE AÇÃO */}
             <div className="flex gap-2 mt-2 pt-2 border-t border-slate-700">
               <button 
                 onClick={() => setShowLinkMenu(false)}
@@ -265,7 +268,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
                   if (selectedModule?.type === 'encounter') actionCommand = 'openEncounter';
                   if (selectedModule?.type === 'text') actionCommand = 'focusModule';
 
-                  // 👇 A MÁGICA: Embutimos a Cena Alvo no pacote! 👇
                   const finalPayload = { 
                     ...(linkPayload || {}), 
                     targetSceneId: selectedSceneId 
