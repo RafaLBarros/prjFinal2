@@ -88,43 +88,85 @@ export default function App() {
   useEffect(() => {
     const handleCrossSceneTeleport = (e: Event) => {
       const customEvent = e as CustomEvent;
-      const { targetId, action, payload } = customEvent.detail;
+      // 👇 Agora ele escuta se é pra rodar em 2º plano (preventScroll)
+      const { targetId, action, payload, preventScroll } = customEvent.detail;
       
       // Verifica se a ação veio com um bilhete de "Troca de Cena"
       if (payload?.targetSceneId && payload.targetSceneId !== activeSceneId) {
         
-        // 1. Muda a cena atual na barra lateral
+        // ========================================================
+        // 👇 O NOVO MOTOR DE BACKGROUND (ÁUDIO SEM MUDAR DE TELA) 👇
+        // ========================================================
+        if (preventScroll === true || preventScroll === 'true') {
+          
+          // Função recursiva que RETORNA o módulo (TypeScript adora isso)
+          const findModuleInTree = (nodes: CampaignNode[], id: string): RpgModule | null => {
+            for (const node of nodes) {
+              if (node.type === 'scene' && node.modules) {
+                const m = node.modules.find(mod => mod.id === id);
+                if (m) return m;
+              }
+              if (node.children) {
+                const found = findModuleInTree(node.children, id);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+
+          // Agora o TypeScript sabe exatamente o que é o foundModule!
+          const foundModule = findModuleInTree(tree, targetId);
+
+          if (foundModule && foundModule.type === 'audio') {
+            // Traduz o comando do botão para o idioma do Mixer Global
+            let globalAction = 'toggle-global-track';
+            if (action === 'play') globalAction = 'add-global-track';
+            if (action === 'pause') globalAction = 'pause-global-track';
+            if (action === 'restart') globalAction = 'add-global-track'; 
+
+            // Dá o Play/Pause direto na caixa de som flutuante!
+            window.dispatchEvent(new CustomEvent(globalAction, {
+              detail: {
+                url: foundModule.data.urlOrPath,
+                title: foundModule.name,
+                volume: foundModule.data.volume,
+                loop: foundModule.data.loop,
+                restart: action === 'restart'
+              }
+            }));
+          }
+
+          return; // 🛑 ABORTA A VIAGEM! O Mestre continua na tela atual tranquilamente.
+        }
+
+        // ========================================================
+        // --- VIAGEM NORMAL (Se a caixa não estiver marcada) ---
+        // ========================================================
         setActiveSceneId(payload.targetSceneId);
         
-        // 2. SISTEMA DE ENTREGA GARANTIDA (Correios do RPG)
         let attempts = 0;
         
         const tryDispatch = () => {
-          // Procura o módulo na tela (prova de que o React terminou de desenhar a cena nova)
           const targetEl = document.getElementById(`module-${targetId}`);
-          
           if (targetEl) {
-            // O módulo nasceu! Dá só 50ms pro useEffect dele plugar o ouvido e atira a ação!
             setTimeout(() => {
               window.dispatchEvent(new CustomEvent('rpg-module-action', {
                 detail: { targetId, action, payload }
               }));
             }, 50);
           } else if (attempts < 20) {
-            // Se o computador estiver lento e não achou, espera 50ms e tenta de novo (faz isso por até 1 segundo)
             attempts++;
             setTimeout(tryDispatch, 50);
           }
         };
 
-        // Inicia a busca!
         setTimeout(tryDispatch, 50);
       }
     };
 
     window.addEventListener('rpg-module-action', handleCrossSceneTeleport);
     return () => window.removeEventListener('rpg-module-action', handleCrossSceneTeleport);
-  }, [activeSceneId]);
+  }, [activeSceneId, tree]); // 👈 ATENÇÃO: Adicionei o 'tree' aqui para ele achar as músicas sempre atualizadas!
 
   // --- FUNÇÕES DE CONTROLE DA ÁRVORE ---
 

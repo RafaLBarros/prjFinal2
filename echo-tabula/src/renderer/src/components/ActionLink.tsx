@@ -3,18 +3,25 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 
 const ActionLinkComponent = (props: any) => {
-  // 👇 AGORA RECEBEMOS O ICONE TAMBÉM! 👇
-  const { targetId, action, label, payload, icon } = props.node.attrs;
+  const { targetId, action, label, payload, icon, preventScroll } = props.node.attrs;
 
   const handleClick = () => {
+    // 1. Sempre dispara a ação global
     window.dispatchEvent(new CustomEvent('rpg-module-action', {
       detail: { 
         targetId, 
         action, 
-        payload: payload ? JSON.parse(payload) : null 
+        payload: payload ? JSON.parse(payload) : null,
+        preventScroll
       }
     }));
 
+    // 👇 2. A TRAVA BLINDADA: Aceita tanto o booleano puro quanto a string do HTML
+    if (preventScroll === true || preventScroll === 'true') {
+      return; 
+    }
+
+    // 3. Caso contrário, faz a rolagem visual normal
     setTimeout(() => {
       const targetElement = document.getElementById(`module-${targetId}`);
       if (targetElement) {
@@ -42,7 +49,6 @@ const ActionLinkComponent = (props: any) => {
         className="bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded text-xs font-bold hover:bg-emerald-600/40 hover:scale-105 transition cursor-pointer flex items-center gap-1.5 shadow-sm"
         title={`Ação: ${action} | Módulo: ${targetId}`}
       >
-        {/* 👇 O ÍCONE ENTRA AQUI (Com fallback para a corrente) 👇 */}
         <span className="text-[10px]">{icon || '🔗'}</span>
         <span>{label}</span>
       </button>
@@ -62,7 +68,17 @@ export const ActionLink = Node.create({
       action: { default: 'toggle' },
       label: { default: 'Ação' },
       payload: { default: null }, 
-      icon: { default: '🔗' }, // 👈 NOVO ATRIBUTO REGISTRADO AQUI
+      icon: { default: '🔗' }, 
+      
+      // 👇 A MÁGICA ACONTECE AQUI: Ensinamos o TipTap a ler e escrever HTML corretamente
+      preventScroll: { 
+        default: false,
+        parseHTML: element => element.getAttribute('data-prevent-scroll') === 'true',
+        renderHTML: attributes => {
+          if (!attributes.preventScroll) return {};
+          return { 'data-prevent-scroll': 'true' };
+        }
+      },
     };
   },
 
