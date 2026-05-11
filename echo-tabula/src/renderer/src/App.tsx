@@ -36,6 +36,73 @@ export default function App() {
   // Estado de Importação e Exportação
   const [isProcessingIO, setIsProcessingIO] = useState(false);
 
+  // ========================================================
+  // --- MOTOR DE VIAGEM NO TEMPO (CTRL+Z E CTRL+Y) ---
+  // ========================================================
+  const [pastStates, setPastStates] = useState<CampaignNode[][]>([]);
+  const [futureStates, setFutureStates] = useState<CampaignNode[][]>([]);
+
+  // 1. Tira uma "Foto" da árvore antes de qualquer mudança destrutiva
+  const takeSnapshot = () => {
+    setPastStates(prev => {
+      const newHistory = [...prev, tree];
+      return newHistory.length > 30 ? newHistory.slice(newHistory.length - 30) : newHistory;
+    });
+    setFutureStates([]); 
+  };
+
+  // 2. Volta no tempo
+  const handleUndo = () => {
+    // 👇 Mudança: Lemos o array diretamente do estado limpo
+    if (pastStates.length === 0) return;
+    
+    const previousState = pastStates[pastStates.length - 1];
+    
+    // As atualizações agora são separadas e independentes!
+    setFutureStates(prev => [tree, ...prev]); 
+    setTree(previousState); 
+    setPastStates(prev => prev.slice(0, prev.length - 1)); 
+  };
+
+  // 3. Avança no tempo
+  const handleRedo = () => {
+    if (futureStates.length === 0) return;
+    
+    const nextState = futureStates[0];
+    
+    setPastStates(prev => [...prev, tree]); 
+    setTree(nextState); 
+    setFutureStates(prev => prev.slice(1)); 
+  };
+
+  // 4. O Ouvido Global do Teclado
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      if (activeEl) {
+        const tagName = activeEl.tagName.toLowerCase();
+        const isEditable = activeEl.getAttribute('contenteditable') === 'true'; 
+        if (tagName === 'input' || tagName === 'textarea' || isEditable) {
+          return; 
+        }
+      }
+
+      if (e.ctrlKey && !e.shiftKey && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        handleUndo();
+      } 
+      else if ((e.ctrlKey && e.key.toLowerCase() === 'y') || (e.ctrlKey && e.shiftKey && e.key.toLowerCase() === 'z')) {
+        e.preventDefault();
+        handleRedo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [tree, pastStates, futureStates]); // 👈 AQUI É O SEGREDO: Adicionamos os históricos para o React sempre usar a versão fresquinha!
+
+
+
   // --- O DESPERTADOR (AUTO-LOAD NO INÍCIO) ---
   useEffect(() => {
     const loadLastCampaign = async () => {
@@ -189,6 +256,8 @@ export default function App() {
   };
 
   const handleAddNode = (parentId: string | null, type: 'folder' | 'scene') => {
+    takeSnapshot(); // 📸 SNAPSHOT AQUI
+    
     const newNode: CampaignNode = {
       id: Math.random().toString(36).substr(2, 9),
       type,
@@ -204,9 +273,7 @@ export default function App() {
           if (node.id === parentId && node.type === 'folder') {
             return { ...node, isOpen: true, children: [...(node.children || []), newNode] };
           }
-          if (node.children) {
-            return { ...node, children: addNodeToParent(node.children) };
-          }
+          if (node.children) return { ...node, children: addNodeToParent(node.children) };
           return node;
         });
       };
@@ -222,21 +289,21 @@ export default function App() {
   // 2. Executa a exclusão de fato
   const executeDeleteNode = () => {
     if (!nodeToDelete) return;
+    
+    takeSnapshot(); // 📸 SNAPSHOT AQUI
 
     const deleteFromTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes
         .filter(node => node.id !== nodeToDelete) 
         .map(node => {
-          if (node.children) {
-            return { ...node, children: deleteFromTree(node.children) }; 
-          }
+          if (node.children) return { ...node, children: deleteFromTree(node.children) }; 
           return node;
         });
     };
     
     setTree(deleteFromTree(tree));
     if (activeSceneId === nodeToDelete) setActiveSceneId(null); 
-    setNodeToDelete(null); // Fecha o modal
+    setNodeToDelete(null); 
   };
 
   // --- FUNÇÃO AUXILIAR: DETECTOR DE PARADOXO ---
@@ -269,12 +336,10 @@ export default function App() {
 
   // --- FUNÇÃO ATUALIZADA: MOVER NÓ COM REORDENAÇÃO ---
   const handleMoveNode = (draggedId: string, targetId: string | null, position: 'before' | 'after' | 'inside' = 'inside') => {
-    
     if (draggedId === targetId) return;
-    if (targetId && isDescendant(tree, draggedId, targetId)) {
-      console.warn("Ação bloqueada: Uma pasta não pode ser movida para dentro de seus próprios filhos.");
-      return; 
-    }
+    if (targetId && isDescendant(tree, draggedId, targetId)) return; 
+    
+    takeSnapshot(); // 📸 SNAPSHOT AQUI
     
     let draggedNode: CampaignNode | null = null;
 
@@ -294,44 +359,34 @@ export default function App() {
     } else {
       const insertNode = (nodes: CampaignNode[]): CampaignNode[] => {
         const result: CampaignNode[] = [];
-        
         for (const node of nodes) {
           if (node.id === targetId) {
             if (position === 'before') result.push(draggedNode!);
-            
             if (position === 'inside' && node.type === 'folder') {
               result.push({ ...node, isOpen: true, children: [...(node.children || []), draggedNode!] });
             } else {
               result.push(node); 
             }
-
             if (position === 'after') result.push(draggedNode!);
-            
           } else {
-            if (node.children) {
-              result.push({ ...node, children: insertNode(node.children) });
-            } else {
-              result.push(node);
-            }
+            if (node.children) result.push({ ...node, children: insertNode(node.children) });
+            else result.push(node);
           }
         }
         return result;
       };
       newTree = insertNode(newTree);
     }
-
     setTree(newTree);
   };
 
   const handleRenameNode = (targetId: string, newName: string) => {
+    takeSnapshot(); // 📸 SNAPSHOT AQUI
+    
     const renameInTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
-        if (node.id === targetId) {
-          return { ...node, name: newName }; 
-        }
-        if (node.children) {
-          return { ...node, children: renameInTree(node.children) }; 
-        }
+        if (node.id === targetId) return { ...node, name: newName }; 
+        if (node.children) return { ...node, children: renameInTree(node.children) }; 
         return node;
       });
     };
@@ -339,14 +394,12 @@ export default function App() {
   };
 
   const handleTogglePin = (targetId: string) => {
+    takeSnapshot(); // 📸 SNAPSHOT AQUI
+    
     const togglePinInTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
-        if (node.id === targetId) {
-          return { ...node, isPinned: !node.isPinned };
-        }
-        if (node.children) {
-          return { ...node, children: togglePinInTree(node.children) };
-        }
+        if (node.id === targetId) return { ...node, isPinned: !node.isPinned };
+        if (node.children) return { ...node, children: togglePinInTree(node.children) };
         return node;
       });
     };
@@ -466,14 +519,12 @@ export default function App() {
   const activeScene = activeSceneId ? getActiveScene(tree) : null;
 
   const handleUpdateSceneModules = (sceneId: string, newModules: any[]) => {
+    takeSnapshot(); // 📸 SNAPSHOT AQUI (Protege Criação, Reordenação e Exclusão de módulos na cena)
+    
     const updateModulesInTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
-        if (node.id === sceneId && node.type === 'scene') {
-          return { ...node, modules: newModules };
-        }
-        if (node.children) {
-          return { ...node, children: updateModulesInTree(node.children) };
-        }
+        if (node.id === sceneId && node.type === 'scene') return { ...node, modules: newModules };
+        if (node.children) return { ...node, children: updateModulesInTree(node.children) };
         return node;
       });
     };
@@ -510,14 +561,12 @@ export default function App() {
   };
 
   const handleChangeNodeIcon = (targetId: string, newIcon: string) => {
+    takeSnapshot(); // 📸 SNAPSHOT AQUI
+    
     const updateIconInTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
-        if (node.id === targetId) {
-          return { ...node, icon: newIcon };
-        }
-        if (node.children) {
-          return { ...node, children: updateIconInTree(node.children) };
-        }
+        if (node.id === targetId) return { ...node, icon: newIcon };
+        if (node.children) return { ...node, children: updateIconInTree(node.children) };
         return node;
       });
     };
