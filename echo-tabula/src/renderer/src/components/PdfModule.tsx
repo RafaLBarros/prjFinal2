@@ -42,7 +42,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
 
   // --- ESTADOS DO MOTOR DE BUSCA ---
   const [searchText, setSearchText] = useState('');
-  const [submittedSearch, setSubmittedSearch] = useState(''); // 👈 O NOVO ESTADO: Salva a palavra só quando dá Enter
+  const [submittedSearch, setSubmittedSearch] = useState(''); 
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
   const [searchResults, setSearchResults] = useState<number[]>([]);
@@ -52,12 +52,13 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   const pdfDocRef = useRef<any>(null);
 
   const bookmarks: { id: string, name: string, page: number }[] = moduleData.data.bookmarks || [];
+  // Usa "as any" para evitar erro no TypeScript caso a propriedade não esteja tipada no RPG.ts
+  const isBookmarksMinimized = (moduleData.data as any).isBookmarksMinimized || false;
 
   // --- MOTOR DE BUSCA GLOBAL ---
   const executeGlobalSearch = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
-    // Se a busca estiver vazia, limpa tudo
     if (!searchText.trim() || !pdfDocRef.current || !numPages) {
       setSubmittedSearch('');
       setSearchResults([]);
@@ -67,7 +68,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
 
     setIsSearching(true);
     setHasSearched(true);
-    setSubmittedSearch(searchText); // 👈 Grava a palavra final para o renderizador de texto usar
+    setSubmittedSearch(searchText); 
     setSearchResults([]);
     setCurrentSearchIndex(0);
 
@@ -118,18 +119,12 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
 
   // --- RENDERIZADOR DE TEXTO (MARCA-TEXTO TRANSLÚCIDO) ---
   const textRenderer = useCallback((textItem: any) => {
-    // Se não tem busca, devolve a string normal
     if (!submittedSearch || searchResults.length === 0) return textItem.str;
     
-    // Cria a nossa Regex mágica
     const regex = createAccentInsensitiveRegex(submittedSearch);
     
-    // Testa se a palavra existe nessa linha
     if (!textItem.str.match(regex)) return textItem.str;
 
-    // A MÁGICA DA TRANSPARÊNCIA: 
-    // background-color em rgba com 40% de opacidade (0.4)
-    // color: transparent (para o texto original do PDF aparecer liso no fundo)
     return textItem.str.replace(regex, (match: string) => 
       `<mark style="background-color: rgba(251, 191, 36, 0.4); color: transparent; border-radius: 3px; padding: 2px 0;">${match}</mark>`
     );
@@ -192,13 +187,9 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
         const targetBookmark = bookmarks.find(b => b.id === payload.bookmarkId);
         
         if (targetBookmark) {
-          // Atualiza a caixinha de texto local e avisa que vai precisar scrollar a tela
           setInputPage(targetBookmark.page.toString());
           setPendingAutoScroll(true);
           
-          // O SEGREDO ESTÁ AQUI:
-          // Em vez de chamar o onUpdate duas vezes (o que faz o React cancelar a primeira),
-          // enviamos TUDO em um único pacote! Abre o módulo E muda a página de uma vez só.
           onUpdate(moduleData.id, { 
             isMinimized: false,
             data: { ...moduleData.data, page: targetBookmark.page }
@@ -265,6 +256,68 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
             </div>
           )}
 
+          {/* 👇 NOVA SEÇÃO RETRÁTIL DE MARCA-PÁGINAS 👇 */}
+          {moduleData.data.filePath && (
+            <div className="bg-slate-900/80 border-b border-slate-700 flex flex-col">
+              <div 
+                className="flex items-center justify-between px-4 py-2 cursor-pointer hover:bg-slate-700/50 transition-colors group"
+                onClick={() => onUpdate(moduleData.id, { data: { ...moduleData.data, isBookmarksMinimized: !isBookmarksMinimized } as any })}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-[10px] text-slate-500 group-hover:text-amber-400 transition-colors">
+                    {isBookmarksMinimized ? '▶' : '▼'}
+                  </span>
+                  <h4 className="text-[10px] font-bold text-slate-500 uppercase tracking-[0.2em] group-hover:text-slate-300 transition-colors">
+                    Marca-Páginas 
+                    <span className="ml-2 lowercase font-normal opacity-50">({bookmarks.length})</span>
+                  </h4>
+                </div>
+                
+                {!isBookmarksMinimized && (
+                  <button 
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setIsAddingBookmark(!isAddingBookmark);
+                    }}
+                    className="text-[10px] bg-amber-600/10 hover:bg-amber-600 text-amber-500 hover:text-white px-2 py-0.5 rounded border border-amber-500/20 transition-all font-bold"
+                  >
+                    {isAddingBookmark ? 'Cancelar' : '+ Novo'}
+                  </button>
+                )}
+              </div>
+
+              {!isBookmarksMinimized && isAddingBookmark && (
+                <div className="px-4 pb-3 pt-1 animate-in fade-in flex gap-2">
+                  <input autoFocus type="text" value={newBookmarkName} onChange={(e) => setNewBookmarkName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddBookmark()} placeholder="Nome do Atalho (Pág Atual)" className="bg-slate-950 text-sm text-slate-200 px-3 py-1.5 rounded focus:outline-none border border-slate-700 flex-1" />
+                  <button onClick={handleAddBookmark} className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-sm font-bold shadow-lg shadow-amber-900/20">Salvar Pág {moduleData.data.page}</button>
+                </div>
+              )}
+
+              {!isBookmarksMinimized && bookmarks.length > 0 && (
+                <div className="px-4 pb-3 flex flex-wrap gap-2 animate-in slide-in-from-top-1 duration-200">
+                  {bookmarks.map(bm => (
+                    <div key={bm.id} className="flex items-center bg-slate-800 border border-slate-700 rounded-md overflow-hidden group/item shadow-sm hover:border-amber-500/50 transition-colors">
+                      <button 
+                        onClick={() => jumpToPage(bm.page)}
+                        className="px-2 py-1 text-xs text-slate-300 hover:bg-amber-600 hover:text-white transition-colors flex items-center gap-2"
+                      >
+                        <span className="opacity-50 font-mono text-[10px]">p.{bm.page}</span>
+                        <span className="font-medium">{bm.name}</span>
+                      </button>
+                      <button 
+                        onClick={() => handleRemoveBookmark(bm.id)}
+                        className="px-1.5 py-1 text-[10px] text-slate-600 hover:text-amber-400 hover:bg-amber-400/10 transition-colors border-l border-slate-700"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* --- CORPO DO PDF --- */}
           <div className="p-4 flex flex-col items-center bg-slate-950 overflow-hidden relative">
             
             {moduleData.data.filePath && (
@@ -305,7 +358,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
                   )}
                 </div>
 
-                {/* --- CONTROLES DE PÁGINA --- */}
+                {/* --- CONTROLES DE PÁGINA (LIMPADO) --- */}
                 <div className="flex items-center gap-3 bg-slate-800 p-2 rounded-full border border-slate-700 shadow-md">
                   <button onClick={goToPrevPage} disabled={moduleData.data.page <= 1} className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 flex items-center justify-center">◀</button>
                   <div className="flex items-center gap-2 text-sm text-slate-300 font-mono">
@@ -314,30 +367,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
                     <span>de {numPages || '?'}</span>
                   </div>
                   <button onClick={goToNextPage} disabled={!numPages || moduleData.data.page >= numPages} className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 flex items-center justify-center">▶</button>
-                  <div className="w-px h-6 bg-slate-600 mx-1"></div>
-                  <button onClick={() => setIsAddingBookmark(!isAddingBookmark)} className={`px-3 py-1 rounded-full text-sm font-medium transition ${isAddingBookmark ? 'bg-amber-600 text-white' : 'bg-slate-700 text-slate-300 hover:bg-slate-600'}`}>🔖 Salvar</button>
                 </div>
-                
-                {isAddingBookmark && (
-                  <div className="flex gap-2 bg-slate-800 p-2 rounded-lg border border-amber-600/50 shadow-lg animate-in fade-in">
-                    <input autoFocus type="text" value={newBookmarkName} onChange={(e) => setNewBookmarkName(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleAddBookmark()} placeholder="Nome do Atalho" className="bg-slate-900 text-sm text-slate-200 px-3 py-1.5 rounded focus:outline-none border border-slate-600" />
-                    <button onClick={handleAddBookmark} className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-1.5 rounded text-sm font-bold">OK</button>
-                  </div>
-                )}
-
-                {/* PRATELEIRA DE ATALHOS */}
-                {bookmarks.length > 0 && (
-                  <div className="flex flex-wrap justify-center gap-2 w-full px-4">
-                    {bookmarks.map(bm => (
-                      <div key={bm.id} className="flex items-center bg-slate-800 border border-slate-600 rounded-md overflow-hidden group hover:border-amber-500 transition-colors">
-                        <button onClick={() => jumpToPage(bm.page)} className="px-3 py-1.5 text-xs text-slate-300 hover:text-amber-400 hover:bg-slate-700">
-                          <span className="text-amber-500">🔖</span> {bm.name} <span className="opacity-50 font-mono text-[10px] ml-1">(p.{bm.page})</span>
-                        </button>
-                        <button onClick={() => handleRemoveBookmark(bm.id)} className="px-2 py-1.5 bg-slate-800 hover:bg-red-900/80 text-slate-500 hover:text-red-400 transition">✕</button>
-                      </div>
-                    ))}
-                  </div>
-                )}
               </div>
             )}
 

@@ -6,6 +6,7 @@ import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import ImageResize from 'tiptap-extension-resize-image';
 import { ActionLink } from './ActionLink';
+import { SearchableSelect } from './SearchableSelect';
 
 interface MenuBarProps {
   editor: Editor | null;
@@ -46,6 +47,9 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
+      // 👇 A TRAVA ANTI-FANTASMA DO MENU PRINCIPAL 👇
+      if (!document.body.contains(event.target as Node)) return;
+      
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setShowLinkMenu(false);
       }
@@ -141,58 +145,62 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
         {showLinkMenu && (
           <div className="absolute top-full mt-2 left-0 w-80 bg-slate-800 border border-slate-600 shadow-[0_15px_50px_rgba(0,0,0,0.8)] rounded-md p-4 z-[100] flex flex-col gap-3">
             
-            <div className="flex flex-col gap-1">
+            {/* 👇 NOVO: CENA ALVO SEARCHABLE 👇 */}
+            <div className="flex flex-col gap-1 relative z-[60]">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><span>📍</span> Cena Alvo:</label>
-              <select 
-                value={selectedSceneId} 
-                onChange={(e) => { setSelectedSceneId(e.target.value); setLinkTargetId(''); setLinkPayload(null); setLinkAction('toggle'); }}
-                className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500 cursor-pointer"
-              >
-                {allScenes.map(scene => <option key={scene.id} value={scene.id}>{scene.path} {scene.id === currentSceneId ? '(Atual)' : ''}</option>)}
-              </select>
+              <SearchableSelect 
+                options={allScenes.map(s => ({ id: s.id, label: s.id === currentSceneId ? `${s.path} (Atual)` : s.path }))}
+                value={selectedSceneId}
+                onChange={(val) => { setSelectedSceneId(val); setLinkTargetId(''); setLinkPayload(null); setLinkAction('toggle'); }}
+                placeholder="Pesquise uma cena..."
+              />
             </div>
 
-            <div className="flex flex-col gap-1">
+            {/* 👇 NOVO: MÓDULO ALVO SEARCHABLE 👇 */}
+            <div className="flex flex-col gap-1 relative z-[50]">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><span>🧩</span> Módulo Alvo:</label>
-              <select 
-                value={linkTargetId} 
-                onChange={(e) => { setLinkTargetId(e.target.value); setLinkPayload(null); setLinkAction('toggle'); }}
-                className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-2 rounded focus:outline-none focus:border-emerald-500 cursor-pointer"
-              >
-                <option value="" disabled>{availableModules.length > 0 ? "Selecione um módulo..." : "Nenhum módulo nesta cena."}</option>
-                {availableModules.map(mod => {
+              <SearchableSelect 
+                options={availableModules.map(m => {
                   let i = '📦';
-                  if (mod.type === 'audio') i = '🎵'; else if (mod.type === 'pdf_crop') i = '📕'; else if (mod.type === 'dice_roller') i = '🎲'; else if (mod.type === 'encounter') i = '⚔️'; else if (mod.type === 'text') i = '📝';
-                  return <option key={mod.id} value={mod.id}>{i} {mod.name}</option>;
+                  if (m.type === 'audio') i = '🎵'; else if (m.type === 'pdf_crop') i = '📕'; else if (m.type === 'dice_roller') i = '🎲'; else if (m.type === 'encounter') i = '⚔️'; else if (m.type === 'text') i = '📝';
+                  return { id: m.id, label: `${i} ${m.name}` };
                 })}
-              </select>
+                value={linkTargetId}
+                onChange={(val) => { setLinkTargetId(val); setLinkPayload(null); setLinkAction('toggle'); }}
+                placeholder={availableModules.length > 0 ? "Pesquise um módulo..." : "Nenhum módulo nesta cena."}
+                disabled={availableModules.length === 0}
+              />
             </div>
 
             {selectedModule?.type === 'pdf_crop' && (
-              <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-red-500">
+              <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-red-500 relative z-[40]">
                 <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Marca-Página:</label>
-                <select value={linkPayload?.bookmarkId || ''} onChange={(e) => setLinkPayload({ bookmarkId: e.target.value })} className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-red-500 cursor-pointer">
-                  <option value="" disabled>Selecione um atalho...</option>
-                  {selectedModule.data.bookmarks?.map((b: any) => <option key={b.id} value={b.id}>{b.name} (Pág {b.page})</option>)}
-                </select>
+                <SearchableSelect 
+                  options={selectedModule.data.bookmarks?.map((b: any) => ({ id: b.id, label: `${b.name} (Pág ${b.page})` })) || []}
+                  value={linkPayload?.bookmarkId || ''}
+                  onChange={(val) => setLinkPayload({ bookmarkId: val })}
+                  placeholder="Pesquise um atalho..."
+                />
               </div>
             )}
 
-            {/* 👇 ATUALIZADO: Menu de Dados com escolha de Rolar vs Focar 👇 */}
             {selectedModule?.type === 'dice_roller' && (
-              <div className="flex flex-col gap-2 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-indigo-500">
+              <div className="flex flex-col gap-2 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-indigo-500 relative z-[30]">
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ataque/Preset:</label>
-                  <select value={linkPayload?.presetId || ''} onChange={(e) => setLinkPayload({ presetId: e.target.value })} className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-indigo-500 cursor-pointer mt-1">
-                    <option value="" disabled>Selecione um preset...</option>
-                    {selectedModule.data.presets?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                  </select>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">Ataque/Preset:</label>
+                  <SearchableSelect 
+                    options={selectedModule.data.presets?.map((p: any) => ({ id: p.id, label: p.name })) || []}
+                    value={linkPayload?.presetId || ''}
+                    onChange={(val) => setLinkPayload({ presetId: val })}
+                    placeholder="Pesquise um preset..."
+                  />
                 </div>
                 <div>
-                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ação do Link:</label>
-                  <select value={linkAction} onChange={(e) => setLinkAction(e.target.value)} className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-indigo-500 cursor-pointer mt-1">
-                    <option value="rollPreset">Focar o Módulo e Rolar</option>
-                    <option value="focusModule">Somente Focar o Módulo</option>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-2 mb-1">Ação do Link:</label>
+                  {/* Para ações com opções fixas e poucas, o Select é mais rápido e não confunde */}
+                  <select value={linkAction} onChange={(e) => setLinkAction(e.target.value)} className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-indigo-500 cursor-pointer">
+                    <option value="rollPreset">Rolar Imediatamente</option>
+                    <option value="focusModule">Apenas Rolar Tela até o Módulo</option>
                   </select>
                 </div>
               </div>
@@ -200,14 +208,14 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
 
             {selectedModule?.type === 'audio' && (
               <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-blue-500">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ação do Áudio:</label>
+                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ação do Áudio:</label>
                 <select value={linkAction} onChange={(e) => setLinkAction(e.target.value)} className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-blue-500 cursor-pointer">
                   <option value="toggle">Tocar / Pausar</option><option value="play">Somente Tocar</option><option value="pause">Somente Pausar</option><option value="restart">Reiniciar do Zero</option>
                 </select>
               </div>
             )}
 
-            <div className="flex flex-col gap-2 bg-slate-950 p-2 rounded border border-slate-700">
+            <div className="flex flex-col gap-2 bg-slate-950 p-2 rounded border border-slate-700 mt-1">
               <div>
                 <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1">Ícone:</label>
                 <div className="flex flex-wrap gap-1">
@@ -236,7 +244,7 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               </label>
             </div>
 
-            <div className="flex gap-2 mt-1 pt-2 border-t border-slate-700">
+            <div className="flex gap-2 pt-2 border-t border-slate-700">
               <button onClick={() => setShowLinkMenu(false)} className="flex-1 px-2 py-1.5 bg-slate-700 hover:bg-slate-600 text-slate-300 rounded text-sm transition font-medium">Cancelar</button>
               <button 
                 onClick={() => {
@@ -245,7 +253,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
                   let actionCommand = 'toggle';
                   if (selectedModule?.type === 'audio') actionCommand = linkAction;
                   if (selectedModule?.type === 'pdf_crop') actionCommand = 'openBookmark';
-                  // 👇 ATUALIZADO: Pega a escolha do usuário se for Rolar ou Focar
                   if (selectedModule?.type === 'dice_roller') actionCommand = linkAction; 
                   if (selectedModule?.type === 'encounter') actionCommand = 'openEncounter';
                   if (selectedModule?.type === 'text') actionCommand = 'focusModule';
