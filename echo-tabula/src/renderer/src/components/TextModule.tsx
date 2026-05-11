@@ -27,7 +27,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
   const [linkAction, setLinkAction] = useState('toggle');
   const [linkIcon, setLinkIcon] = useState('🔗');
   
-  // 👇 NOVO ESTADO: O Checkbox
   const [preventScroll, setPreventScroll] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null); 
@@ -55,7 +54,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showLinkMenu]);
 
-  // 👇 INTELIGÊNCIA: Se for áudio, marca a caixa automaticamente!
   const getScenes = (nodes: CampaignNode[], path = ''): any[] => {
     let scenes: any[] = [];
     nodes.forEach(node => {
@@ -75,10 +73,18 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
 
   const selectedModule = availableModules.find(m => m.id === linkTargetId);
 
+  // 👇 ATUALIZADO: Define as ações padrão corretas quando você troca o tipo do módulo
   useEffect(() => {
-    // Se o usuário selecionou um módulo de áudio, sugerimos não rolar a tela
-    if (selectedModule?.type === 'audio') setPreventScroll(true);
-    else setPreventScroll(false);
+    if (selectedModule?.type === 'audio') {
+      setPreventScroll(true);
+      setLinkAction('toggle');
+    } else if (selectedModule?.type === 'dice_roller') {
+      setPreventScroll(false);
+      setLinkAction('rollPreset'); // Padrão: Rolar
+    } else {
+      setPreventScroll(false);
+      setLinkAction('toggle');
+    }
   }, [selectedModule]);
 
   if (!editor) return null;
@@ -172,13 +178,23 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               </div>
             )}
 
+            {/* 👇 ATUALIZADO: Menu de Dados com escolha de Rolar vs Focar 👇 */}
             {selectedModule?.type === 'dice_roller' && (
-              <div className="flex flex-col gap-1 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-indigo-500">
-                <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ataque/Rolagem:</label>
-                <select value={linkPayload?.presetId || ''} onChange={(e) => setLinkPayload({ presetId: e.target.value })} className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-indigo-500 cursor-pointer">
-                  <option value="" disabled>Selecione um preset...</option>
-                  {selectedModule.data.presets?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
-                </select>
+              <div className="flex flex-col gap-2 bg-slate-900/50 p-2 border border-slate-700 rounded rounded-l-none border-l-2 border-l-indigo-500">
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ataque/Preset:</label>
+                  <select value={linkPayload?.presetId || ''} onChange={(e) => setLinkPayload({ presetId: e.target.value })} className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-indigo-500 cursor-pointer mt-1">
+                    <option value="" disabled>Selecione um preset...</option>
+                    {selectedModule.data.presets?.map((p: any) => <option key={p.id} value={p.id}>{p.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Ação do Link:</label>
+                  <select value={linkAction} onChange={(e) => setLinkAction(e.target.value)} className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-indigo-500 cursor-pointer mt-1">
+                    <option value="rollPreset">Focar o Módulo e Rolar</option>
+                    <option value="focusModule">Somente Focar o Módulo</option>
+                  </select>
+                </div>
               </div>
             )}
 
@@ -207,7 +223,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               </div>
             </div>
 
-            {/* 👇 NOVO: O Checkbox do Prevent Scroll 👇 */}
             <div className="flex items-center gap-2 bg-slate-900/50 p-2 rounded border border-slate-700">
               <input
                 type="checkbox"
@@ -230,7 +245,8 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
                   let actionCommand = 'toggle';
                   if (selectedModule?.type === 'audio') actionCommand = linkAction;
                   if (selectedModule?.type === 'pdf_crop') actionCommand = 'openBookmark';
-                  if (selectedModule?.type === 'dice_roller') actionCommand = 'rollPreset';
+                  // 👇 ATUALIZADO: Pega a escolha do usuário se for Rolar ou Focar
+                  if (selectedModule?.type === 'dice_roller') actionCommand = linkAction; 
                   if (selectedModule?.type === 'encounter') actionCommand = 'openEncounter';
                   if (selectedModule?.type === 'text') actionCommand = 'focusModule';
 
@@ -244,7 +260,7 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
                       label: linkLabel,
                       payload: JSON.stringify(finalPayload),
                       icon: linkIcon,
-                      preventScroll: preventScroll // 👈 SALVA NO TEXTO
+                      preventScroll: preventScroll
                     }
                   }).run();
 

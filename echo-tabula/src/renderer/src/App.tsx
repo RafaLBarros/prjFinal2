@@ -30,6 +30,9 @@ export default function App() {
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
   const [editingCampaignName, setEditingCampaignName] = useState('');
 
+// 👇 NOVO: Guarda o ID do item que o usuário quer excluir na sidebar
+  const [nodeToDelete, setNodeToDelete] = useState<string | null>(null);
+
   // Estado de Importação e Exportação
   const [isProcessingIO, setIsProcessingIO] = useState(false);
 
@@ -211,10 +214,18 @@ export default function App() {
     }
   };
 
+  // 1. Apenas abre o modal de confirmação
   const handleDeleteNode = (targetId: string) => {
+    setNodeToDelete(targetId);
+  };
+
+  // 2. Executa a exclusão de fato
+  const executeDeleteNode = () => {
+    if (!nodeToDelete) return;
+
     const deleteFromTree = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes
-        .filter(node => node.id !== targetId) 
+        .filter(node => node.id !== nodeToDelete) 
         .map(node => {
           if (node.children) {
             return { ...node, children: deleteFromTree(node.children) }; 
@@ -222,8 +233,10 @@ export default function App() {
           return node;
         });
     };
+    
     setTree(deleteFromTree(tree));
-    if (activeSceneId === targetId) setActiveSceneId(null); 
+    if (activeSceneId === nodeToDelete) setActiveSceneId(null); 
+    setNodeToDelete(null); // Fecha o modal
   };
 
   // --- FUNÇÃO AUXILIAR: DETECTOR DE PARADOXO ---
@@ -741,6 +754,35 @@ export default function App() {
                   </div>
                 ))
               )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 👇 NOVO MODAL: Confirmação de Exclusão da Barra Lateral 👇 */}
+      {nodeToDelete && (
+        <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
+          <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl w-96 flex flex-col gap-4 animate-in zoom-in-95">
+            <div className="flex items-center gap-3 text-red-400">
+              <span className="text-3xl">⚠️</span>
+              <h3 className="text-xl font-bold">Excluir Item</h3>
+            </div>
+            <p className="text-sm text-slate-400">
+              Tem certeza que deseja excluir? Se for uma pasta, <strong className="text-slate-200">todo o conteúdo dentro dela</strong> será perdido permanentemente.
+            </p>
+            <div className="flex justify-end gap-2 mt-2">
+              <button 
+                onClick={() => setNodeToDelete(null)} 
+                className="px-4 py-2 text-slate-400 hover:text-white transition font-medium"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={executeDeleteNode} 
+                className="px-4 py-2 bg-red-600 hover:bg-red-500 text-white font-medium rounded transition shadow-lg shadow-red-900/20"
+              >
+                Sim, Excluir
+              </button>
             </div>
           </div>
         </div>

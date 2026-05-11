@@ -60,6 +60,20 @@ export function SceneManager({ scene, campaignNodes, onUpdateModules, onRenameSc
   const [dropTargetId, setDropTargetId] = useState<string | null>(null);
   const [dropPosition, setDropPosition] = useState<'before' | 'after' | null>(null);
 
+  // 👇 NOVOS ESTADOS PARA EXCLUSÃO INTELIGENTE
+  const [moduleToDelete, setModuleToDelete] = useState<string | null>(null);
+
+  // 👇 NOVA FUNÇÃO: Avalia se o módulo tem dados preciosos
+  const hasValuableContent = (mod: RpgModule) => {
+    if (mod.type === 'text') return mod.data.content !== '' && mod.data.content !== '<p></p>';
+    if (mod.type === 'audio') return !!mod.data.urlOrPath;
+    if (mod.type === 'pdf_crop') return !!mod.data.filePath;
+    if (mod.type === 'encounter') return mod.data.combatants && mod.data.combatants.length > 0;
+    if (mod.type === 'dice_roller') return mod.data.presets && mod.data.presets.length > 0;
+    return false;
+  };
+  
+
   // --- NOVA FUNÇÃO: AUTO-SCROLL NAS BORDAS ---
   const handleAutoScroll = (clientY: number) => {
     const container = scrollContainerRef.current;
@@ -220,20 +234,13 @@ return (
                 <div className="flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md z-10 hover:z-30 focus-within:z-[60]">
                   
                   {mod.type === 'text' && (
-                    <TextModule 
-                      moduleData={mod as TextType} 
-                      allModules={modules} 
-                      campaignNodes={campaignNodes} 
-                      currentSceneId={scene.id} 
-                      onUpdate={handleUpdateModule} 
-                    />
+                    <TextModule moduleData={mod as TextType} allModules={modules} campaignNodes={campaignNodes} currentSceneId={scene.id} onUpdate={handleUpdateModule} />
                   )}
                   {mod.type === 'audio' && <AudioModule moduleData={mod as AudioType} onUpdate={handleUpdateModule} />}
                   {mod.type === 'pdf_crop' && <PdfModule moduleData={mod as PdfType} onUpdate={handleUpdateModule} />}
                   {mod.type === 'encounter' && <EncounterModule moduleData={mod as EncounterType} onUpdate={handleUpdateModule} />}
                   {mod.type === 'dice_roller' && <DiceRollerModule moduleData={mod as DiceRollerType} onUpdate={handleUpdateModule} />}
 
-                  {/* NOVO: Botão Desencaixar (Pop-up) */}
                   <button 
                     onClick={() => handleUpdateModule(mod.id, { isFloated: true })}
                     className="absolute -top-3 right-8 bg-slate-700 hover:bg-blue-500 text-white w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 group-hover:scale-100 flex items-center justify-center font-bold z-10 border-2 border-slate-800"
@@ -242,14 +249,45 @@ return (
                     🗗
                   </button>
 
-                  {/* Botão Remover Original */}
+                  {/* 👇 BOTÃO ATUALIZADO COM A INTELIGÊNCIA 👇 */}
                   <button 
-                    onClick={() => handleDeleteModule(mod.id)}
+                    onClick={() => {
+                      if (hasValuableContent(mod)) setModuleToDelete(mod.id);
+                      else handleDeleteModule(mod.id); // Se estiver vazio, apaga direto!
+                    }}
                     className="absolute -top-3 -right-3 bg-red-600 hover:bg-red-500 text-white w-8 h-8 rounded-full opacity-0 group-hover:opacity-100 transition-all shadow-lg scale-90 group-hover:scale-100 flex items-center justify-center font-bold z-10 border-2 border-slate-800"
                     title="Remover Módulo"
                   >
                     ✕
                   </button>
+
+                  {/* 👇 NOVO MODAL INLINE: Sobrepõe o módulo se precisar confirmar 👇 */}
+                  {moduleToDelete === mod.id && (
+                    <div className="absolute inset-0 z-[100] bg-slate-900/90 backdrop-blur-sm rounded-md flex items-center justify-center border-2 border-red-500/50 animate-in fade-in zoom-in-95">
+                      <div className="text-center flex flex-col items-center gap-3 p-4">
+                        <span className="text-4xl animate-bounce">⚠️</span>
+                        <div>
+                          <p className="text-slate-200 text-base font-bold">Este módulo possui conteúdo salvo.</p>
+                          <p className="text-slate-400 text-sm">Deseja realmente excluí-lo?</p>
+                        </div>
+                        <div className="flex gap-3 mt-2">
+                          <button 
+                            onClick={() => setModuleToDelete(null)} 
+                            className="px-5 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded text-xs transition font-bold"
+                          >
+                            Cancelar
+                          </button>
+                          <button 
+                            onClick={() => { handleDeleteModule(mod.id); setModuleToDelete(null); }} 
+                            className="px-5 py-2 bg-red-600 hover:bg-red-500 text-white rounded text-xs transition font-bold shadow-lg shadow-red-900/50"
+                          >
+                            Sim, Excluir
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                 </div>
 
               </div>
