@@ -600,21 +600,23 @@ export default function App() {
       
       {/* --- BARRA LATERAL (Esquerda) --- */}
       <div className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
-        <div className="p-4 border-b border-slate-800 flex flex-col gap-4">
-          <div className="flex justify-between items-center">
+        <div className="p-4 border-b border-slate-800 flex flex-col gap-4 relative">
+          
+          {/* 👇 O FANTASMA DO SALVAMENTO FLUTUANDO NO TOPO 👇 */}
+          <div className="absolute -top-1 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none mt-1">
+            {saveStatus === 'saving' && <span className="text-[10px] bg-slate-900/80 px-2 rounded-full text-emerald-400 animate-pulse font-medium shadow">Salvando...</span>}
+            {saveStatus === 'saved' && <span className="text-[10px] bg-slate-900/80 px-2 rounded-full text-slate-500 font-medium">Salvo</span>}
+            {isProcessingIO && <span className="text-[10px] bg-slate-900/80 px-2 rounded-full text-blue-400 animate-pulse font-medium shadow">Processando...</span>}
+          </div>
+
+          <div className="flex justify-between items-center pt-2">
             <h1 className="font-bold text-emerald-500 tracking-wider text-sm uppercase">Echo Tabula</h1>
             
             <div className="flex gap-2 items-center">
-              {saveStatus === 'saving' && <span className="text-[10px] text-emerald-400 animate-pulse font-medium">Salvando...</span>}
-              {saveStatus === 'saved' && <span className="text-[10px] text-slate-500 font-medium">Salvo</span>}
-              {isProcessingIO && <span className="text-[10px] text-blue-400 animate-pulse font-medium">Processando...</span>}
-              
               <button onClick={handleImportCampaign} disabled={isProcessingIO} className="text-slate-400 hover:text-blue-400 transition-colors text-lg disabled:opacity-50" title="Importar Pacote (.tabula)">
                 📥
               </button>
-
               <div className="w-px h-4 bg-slate-700 mx-1"></div>
-
               <button onClick={handleOpenLoadClick} className="text-slate-400 hover:text-blue-400 transition-colors" title="Abrir Campanha">
                 📂
               </button>
