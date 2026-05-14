@@ -435,23 +435,53 @@ app.whenReady().then(async () => {
 
   // --- EVENTOS VISUAIS DO UPDATER ---
   autoUpdater.logger = log;
+  
+  // 👇 AS DUAS REGRAS DE OURO 👇
+  autoUpdater.autoDownload = true; // Permite baixar nos bastidores para não travar a internet
+  autoUpdater.autoInstallOnAppQuit = false; // Proíbe o aplicativo de atualizar escondido quando for fechado!
+
   autoUpdater.on('checking-for-update', () => log.info("🔍 Checking for update..."));
+  
   autoUpdater.on('update-available', () => {
-    log.info("✅ Update available!");
-    dialog.showMessageBox({ type: 'info', title: 'Atualização Encontrada', message: 'Nova versão em download...' });
+    log.info("✅ Update available! Downloading in background...");
+    // Removido o dialog.showMessageBox daqui para não interromper o usuário à toa.
   });
+  
   autoUpdater.on('update-not-available', () => log.info("❌ No update available"));
+  
   autoUpdater.on('error', (err) => {
     log.error("💥 Update error:", err);
-    dialog.showErrorBox('Erro na Atualização', err == null ? "Erro desconhecido" : (err.stack || err).toString());
+    // Erros silenciosos de rede são comuns, evitamos mostrar popup a menos que seja crítico
   });
-  autoUpdater.on('download-progress', (progress) => log.info(`📦 Downloading: ${progress.percent}%`));
-  autoUpdater.on('update-downloaded', () => {
+  
+  autoUpdater.on('download-progress', (progress) => log.info(`📦 Downloading: ${Math.round(progress.percent)}%`));
+  
+  // 👇 A NOVA LÓGICA DE INSTALAÇÃO CONSCIENTE 👇
+  autoUpdater.on('update-downloaded', async (info) => {
     log.info("🎉 Update downloaded!");
-    dialog.showMessageBox({ type: 'info', title: 'Atualização Pronta', message: 'Download concluído!' });
+    
+    const result = await dialog.showMessageBox({
+      type: 'info',
+      title: 'Echo Tabula - Atualização Pronta',
+      message: `Uma nova versão (${info.version}) está pronta para instalação!`,
+      detail: 'Deseja instalar a atualização agora? O aplicativo será reiniciado.\n\nSe escolher "Mais Tarde", você continuará usando a versão atual com segurança.',
+      buttons: ['Instalar e Reiniciar', 'Mais Tarde'],
+      defaultId: 0, // Destaca o botão de instalar
+      cancelId: 1   // Se o usuário apertar ESC ou fechar a janela, assume "Mais Tarde"
+    });
+
+    if (result.response === 0) {
+      log.info("Iniciando instalação visual...");
+      // quitAndInstall(isSilent, isForceRunAfter)
+      // Passando "false" no primeiro argumento, nós forçamos o Windows a mostrar a barrinha verde de progresso!
+      autoUpdater.quitAndInstall(false, true);
+    } else {
+      log.info("Usuário escolheu adiar a atualização.");
+    }
   });
 
   autoUpdater.checkForUpdates();
+
 })
 
 app.on('window-all-closed', () => {
