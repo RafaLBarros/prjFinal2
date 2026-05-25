@@ -1,7 +1,7 @@
 // src/renderer/src/components/EncounterModule.tsx
-import { EncounterModule as EncounterModuleType, RpgModule, Combatant, CombatantEffect } from '../types/rpg';
+import { EncounterModule as EncounterModuleType, RpgModule, Combatant, CombatantEffect } from '../../types/rpg';
 import { useState, useEffect } from 'react';
-import { moduleEventBus } from '../core/events/moduleEventBus';
+import { moduleEventBus } from '../../core/events/moduleEventBus';
 
 interface Props {
   moduleData: EncounterModuleType;

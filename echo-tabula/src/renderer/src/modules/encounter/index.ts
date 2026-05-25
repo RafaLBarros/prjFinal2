@@ -1,0 +1,1 @@
+export { EncounterModule } from './EncounterModule';

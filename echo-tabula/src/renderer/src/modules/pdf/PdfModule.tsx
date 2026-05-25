@@ -1,10 +1,10 @@
 // src/renderer/src/components/PdfModule.tsx
-import { PdfCropModule as PdfModuleType, RpgModule } from '../types/rpg';
+import { PdfCropModule as PdfModuleType, RpgModule } from '../../types/rpg';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import { moduleEventBus } from '../core/events/moduleEventBus';
+import { moduleEventBus } from '../../core/events/moduleEventBus';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',

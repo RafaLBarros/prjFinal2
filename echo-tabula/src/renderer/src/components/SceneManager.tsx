@@ -1,10 +1,10 @@
 // src/renderer/src/components/SceneManager.tsx
 import { CampaignNode, RpgModule, TextModule as TextType, AudioModule as AudioType, PdfCropModule as PdfType, EncounterModule as EncounterType, DiceRollerModule as DiceRollerType} from '../types/rpg';
-import { TextModule } from './TextModule';
-import { AudioModule } from './AudioModule';
-import { PdfModule } from './PdfModule';
-import { EncounterModule } from './EncounterModule';
-import { DiceRollerModule } from './DiceRollerModule';
+import { TextModule } from '../modules/text';
+import { AudioModule } from '../modules/audio';
+import { PdfModule } from '../modules/pdf';
+import { EncounterModule } from '../modules/encounter';
+import { DiceRollerModule } from '../modules/dice';
 import { useState } from 'react';
 
 // IMPORTAÇÕES DO DND-KIT

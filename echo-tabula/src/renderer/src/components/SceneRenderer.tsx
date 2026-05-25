@@ -1,7 +1,7 @@
 // src/renderer/src/components/SceneRenderer.tsx
 import { RpgModule } from '../types/rpg';
-import { TextModule } from './TextModule';
-import { AudioModule } from './AudioModule';
+import { TextModule } from '../modules/text';
+import { AudioModule } from '../modules/audio';
 
 interface Props {
   modules: RpgModule[];

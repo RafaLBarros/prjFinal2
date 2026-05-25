@@ -1,7 +1,7 @@
 // src/renderer/src/components/DiceRollerModule.tsx
-import { DiceRollerModule as DiceModuleType, RpgModule, DicePreset } from '../types/rpg';
+import { DiceRollerModule as DiceModuleType, RpgModule, DicePreset } from '../../types/rpg';
 import { useState, useEffect } from 'react';
-import { moduleEventBus } from '../core/events/moduleEventBus';
+import { moduleEventBus } from '../../core/events/moduleEventBus';
 
 interface Props {
   moduleData: DiceModuleType;

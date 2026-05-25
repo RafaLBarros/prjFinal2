@@ -1,6 +1,6 @@
 // src/renderer/src/components/GlobalAudioPlayer.tsx
 import { useState, useEffect, useRef } from 'react';
-import { moduleEventBus } from '../core/events/moduleEventBus';
+import { moduleEventBus } from '../events/moduleEventBus';
 
 interface Track {
   url: string;

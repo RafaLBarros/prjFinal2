@@ -3,8 +3,8 @@ import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { CampaignNode, RpgModule } from './types/rpg';
 import { SceneManager } from './components/SceneManager';
-import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
-import { FloatingModuleManager } from './components/FloatingModuleManager';
+import { GlobalAudioPlayer } from './core/audio/GlobalAudioPlayer';
+import { FloatingModuleManager } from './core/windows/FloatingModuleManager';
 import { useHistoryState } from './core/history/useHistoryState';
 
 export default function App() {

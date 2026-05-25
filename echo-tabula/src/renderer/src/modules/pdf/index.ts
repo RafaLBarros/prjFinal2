@@ -1,0 +1,1 @@
+export { PdfModule } from './PdfModule';

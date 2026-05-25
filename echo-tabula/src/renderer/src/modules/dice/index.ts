@@ -1,0 +1,1 @@
+export { DiceRollerModule } from './DiceRollerModule';

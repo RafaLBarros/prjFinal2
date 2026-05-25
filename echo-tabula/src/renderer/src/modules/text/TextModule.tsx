@@ -1,12 +1,12 @@
 // src/renderer/src/components/TextModule.tsx
 import { useState, useEffect, useRef } from 'react';
-import { TextModule as TextModuleType, RpgModule, CampaignNode } from '../types/rpg';
+import { TextModule as TextModuleType, RpgModule, CampaignNode } from '../../types/rpg';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
 import ImageResize from 'tiptap-extension-resize-image';
 import { ActionLink } from './ActionLink';
-import { SearchableSelect } from './SearchableSelect';
+import { SearchableSelect } from '../../components/SearchableSelect';
 
 interface MenuBarProps {
   editor: Editor | null;
