@@ -74,17 +74,41 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
   const importAudio = async () => {
     try {
       setIsLoading(true);
-      const result = await (window as any).electron.ipcRenderer.invoke('fs:importAsset');
-      if (result && result.success) onUpdate(moduleData.id, { data: { ...moduleData.data, urlOrPath: `rpg://${result.fileName}` } });
-    } catch (error) { console.error(error); } finally { setIsLoading(false); }
+      const result = await window.api.importAsset();
+
+      if (result?.success && typeof result.fileName === 'string') {
+        onUpdate(moduleData.id, {
+          data: {
+            ...moduleData.data,
+            urlOrPath: `rpg://asset/${encodeURIComponent(result.fileName)}`
+          }
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const selectFromVault = async () => {
     try {
       setIsLoading(true);
-      const result = await (window as any).electron.ipcRenderer.invoke('fs:selectFromVault');
-      if (result && result.success) onUpdate(moduleData.id, { data: { ...moduleData.data, urlOrPath: `rpg://${result.fileName}` } });
-    } catch (error) { console.error(error); } finally { setIsLoading(false); }
+      const result = await window.api.selectFromVault();
+
+      if (result?.success && typeof result.fileName === 'string') {
+        onUpdate(moduleData.id, {
+          data: {
+            ...moduleData.data,
+            urlOrPath: `rpg://asset/${encodeURIComponent(result.fileName)}`
+          }
+        });
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   if (!moduleData.isActive) return null;

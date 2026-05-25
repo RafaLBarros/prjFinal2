@@ -1,6 +1,6 @@
 // src/main/index.ts
 import { app, shell, BrowserWindow, ipcMain, dialog, protocol, net } from 'electron'
-import { join, basename } from 'path'
+import { join, basename, resolve, sep } from 'path'
 import { pathToFileURL } from 'url'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { autoUpdater } from 'electron-updater'
@@ -13,16 +13,25 @@ import AdmZip from 'adm-zip';
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'rpg',
-    privileges: { 
-      standard: true, 
-      secure: true, 
-      supportFetchAPI: true, 
-      corsEnabled: true, 
-      bypassCSP: true, 
-      stream: true 
+    privileges: {
+      standard: true,
+      secure: true,
+      supportFetchAPI: true,
+      corsEnabled: false,
+      stream: true
     }
   }
 ])
+
+//FUNÇÃO AUXILIAR: Garante que o nome do arquivo seja seguro para o sistema de arquivos, evitando caracteres proibidos e garantindo a extensão .json
+
+function sanitizeJsonFileName(fileName: string): string {
+  const base = basename(fileName)
+  const withoutInvalidChars = base.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+  return withoutInvalidChars.endsWith('.json')
+    ? withoutInvalidChars
+    : `${withoutInvalidChars}.json`
+}
 
 // --- INÍCIO DA NOSSA API DE ARQUIVOS ---
 ipcMain.handle('dialog:openFile', async () => {
@@ -151,8 +160,10 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      webSecurity: false
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+      webSecurity: true
     }
   })
 
@@ -193,7 +204,7 @@ app.whenReady().then(async () => {
     try {
       const campaignsPath = join(app.getPath('userData'), 'campaigns')
       await fs.mkdir(campaignsPath, { recursive: true }).catch(() => {})
-      const safeName = fileName.endsWith('.json') ? fileName : `${fileName}.json`
+      const safeName = sanitizeJsonFileName(fileName)
       const fullPath = join(campaignsPath, safeName)
       await fs.writeFile(fullPath, content, 'utf-8')
       return { success: true, fileName: safeName }
@@ -204,7 +215,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('fs:loadCampaign', async (_, fileName) => {
     try {
-      const fullPath = join(app.getPath('userData'), 'campaigns', fileName)
+      const safeName = sanitizeJsonFileName(fileName)
+      const fullPath = join(app.getPath('userData'), 'campaigns', safeName)
       const content = await fs.readFile(fullPath, 'utf-8')
       return { success: true, content }
     } catch (error: any) {
@@ -214,7 +226,8 @@ app.whenReady().then(async () => {
 
   ipcMain.handle('fs:deleteCampaign', async (_, fileName) => {
     try {
-      const fullPath = join(app.getPath('userData'), 'campaigns', fileName)
+      const safeName = sanitizeJsonFileName(fileName)
+      const fullPath = join(app.getPath('userData'), 'campaigns', safeName)
       await fs.rm(fullPath)
       return { success: true }
     } catch (error: any) {
@@ -226,7 +239,7 @@ app.whenReady().then(async () => {
     try {
       const dir = join(app.getPath('userData'), 'campaigns')
       const oldPath = join(dir, oldName)
-      const safeNewName = newName.endsWith('.json') ? newName : `${newName}.json`
+      const safeNewName = sanitizeJsonFileName(newName)
       const newPath = join(dir, safeNewName)
 
       const files = await fs.readdir(dir)
@@ -290,11 +303,13 @@ app.whenReady().then(async () => {
       const findAssetsDeep = (obj: any) => {
         if (typeof obj === 'string') {
           // Captura links rpg:// perdidos no meio de anotações e descrições
-          const matches = obj.match(/rpg:\/\/([^"'\s]+)/g)
+          const matches = obj.match(/rpg:\/\/asset\/[^"'\s<>]+|rpg:\/\/\/?[^"'\s<>]+/g)
           if (matches) {
             matches.forEach((m: string) => {
-              let rawName = m.replace(/^rpg:\/\//i, '');
-              rawName = rawName.replace(/\/+$/, ''); // Remove a barra do final
+              let rawName = m.replace(/^rpg:\/\/asset\//i, '');
+              rawName = rawName.replace(/^rpg:\/\//i, '');
+              rawName = rawName.replace(/^\/+/, '');
+              rawName = rawName.replace(/\/+$/, '');
               assetsToExport.add(decodeURIComponent(rawName));
             })
           }
@@ -308,7 +323,9 @@ app.whenReady().then(async () => {
               const val = obj[key];
               if (!val.startsWith('http')) {
                 // Remove rpg:// se existir, remove barras residuais e decodifica.
-                let rawName = val.replace(/^rpg:\/\//i, '');
+                let rawName = val.replace(/^rpg:\/\/asset\//i, '');
+                rawName = rawName.replace(/^rpg:\/\//i, '');
+                rawName = rawName.replace(/^\/+/, '');
                 rawName = rawName.replace(/\/+$/, '');
                 assetsToExport.add(decodeURIComponent(rawName));
               }
@@ -368,13 +385,23 @@ app.whenReady().then(async () => {
       for (const zipEntry of zipEntries) {
         if (!zipEntry.isDirectory) {
           if (zipEntry.entryName.endsWith('.json') && !zipEntry.entryName.includes('/')) {
-            jsonFileName = basename(zipEntry.entryName) 
+            jsonFileName = sanitizeJsonFileName(zipEntry.entryName)
             const jsonContent = zipEntry.getData().toString('utf8')
             await fs.writeFile(join(campaignsPath, jsonFileName), jsonContent, 'utf-8')
           } else if (zipEntry.entryName.startsWith('assets/')) {
             const mediaName = basename(zipEntry.entryName)
+            if (!mediaName) continue
+
+            const safeMediaPath = resolve(vaultPath, mediaName)
+            const safeVaultPath = resolve(vaultPath)
+
+            if (!safeMediaPath.startsWith(safeVaultPath)) {
+              console.warn(`[Importação] Entrada ignorada por segurança: ${zipEntry.entryName}`)
+              continue
+            }
+
             const mediaContent = zipEntry.getData()
-            await fs.writeFile(join(vaultPath, mediaName), mediaContent)
+            await fs.writeFile(safeMediaPath, mediaContent)
           }
         }
       }
@@ -399,29 +426,68 @@ app.whenReady().then(async () => {
 
   protocol.handle('rpg', async (request) => {
     try {
-      // Limpa os parâmetros estranhos do final da URL
-      const rawUrl = request.url.replace(/^rpg:\/\//i, '');
-      const cleanPath = rawUrl.split('?')[0].split('#')[0];
-      const finalString = cleanPath.replace(/^\/+|\/+$/g, '');
-      
-      const fileName = decodeURIComponent(finalString);
-      const absolutePath = join(assetsVaultPath, fileName);
+      const safeVaultPath = resolve(assetsVaultPath)
 
-      try {
-        await fs.stat(absolutePath);
-      } catch (err) {
-        console.error(`[Protocolo RPG] Arquivo não encontrado: ${absolutePath}`);
-        return new Response('File not found', { status: 404 });
+      const extractFileNameFromRequest = (requestUrl: string): string => {
+        const url = new URL(requestUrl)
+
+        // Formato novo e recomendado:
+        // rpg://asset/NOME_DO_ARQUIVO
+        if (url.hostname === 'asset') {
+          return decodeURIComponent(url.pathname.replace(/^\/+/, ''))
+        }
+
+        // Compatibilidade com formato antigo:
+        // rpg:///NOME_DO_ARQUIVO
+        if (url.pathname && url.pathname !== '/') {
+          return decodeURIComponent(url.pathname.replace(/^\/+/, ''))
+        }
+
+        // Compatibilidade com formato antigo problemático:
+        // rpg://NOME_DO_ARQUIVO
+        return decodeURIComponent(requestUrl
+          .replace(/^rpg:\/\//i, '')
+          .split('?')[0]
+          .split('#')[0]
+          .replace(/^\/+/, '')
+          .replace(/\/+$/, '')
+        )
       }
 
-      const fileUrl = pathToFileURL(absolutePath).toString();
-      return net.fetch(fileUrl);
-      
+      const requestedName = extractFileNameFromRequest(request.url)
+      const safeFileName = basename(requestedName)
+      let absolutePath = resolve(safeVaultPath, safeFileName)
+
+      if (!absolutePath.startsWith(safeVaultPath + sep)) {
+        console.error(`[Protocolo RPG] Tentativa de acesso fora do cofre: ${request.url}`)
+        return new Response('Forbidden', { status: 403 })
+      }
+
+      try {
+        await fs.stat(absolutePath)
+      } catch {
+        // Fallback de compatibilidade para arquivos antigos que foram salvos usando URL punycode.
+        const files = await fs.readdir(safeVaultPath)
+
+        const matchedFile = files.find((file) => {
+          const oldStyleUrl = new URL(`rpg://${file}`)
+          return oldStyleUrl.hostname === safeFileName
+        })
+
+        if (!matchedFile) {
+          console.error(`[Protocolo RPG] Arquivo não encontrado: ${absolutePath}`)
+          return new Response('File not found', { status: 404 })
+        }
+
+        absolutePath = resolve(safeVaultPath, matchedFile)
+      }
+
+      return net.fetch(pathToFileURL(absolutePath).toString())
     } catch (error) {
-      console.error(`[Protocolo RPG] Erro fatal na URL ${request.url}:`, error);
-      return new Response('Internal Error', { status: 500 });
+      console.error(`[Protocolo RPG] Erro fatal na URL ${request.url}:`, error)
+      return new Response('Internal Error', { status: 500 })
     }
-  });
+  })
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

@@ -2,8 +2,25 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    
     <title>Echo Tabula</title>
-    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob:; media-src * data: blob:; frame-src * data: blob:;">
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="
+        default-src 'self';
+        script-src 'self';
+        style-src 'self' 'unsafe-inline';
+        img-src 'self' data: blob: rpg: https://fonts.gstatic.com https://cdn.jsdelivr.net;
+        media-src 'self' blob: rpg:;
+        font-src 'self' data:;
+        connect-src 'self' rpg:;
+        worker-src 'self' blob:;
+        object-src 'none';
+        frame-src 'none';
+        base-uri 'self';
+        form-action 'none';
+      "
+    />
   </head>
 
   <body>

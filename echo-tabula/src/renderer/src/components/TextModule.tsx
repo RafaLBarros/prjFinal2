@@ -109,7 +109,9 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
     if (window.api && window.api.importImage) {
       const result = await window.api.importImage();
       if (result.success && result.fileName) {
-        (editor.chain().focus() as any).setImage({ src: `rpg://${result.fileName}` }).run();
+        (editor.chain().focus() as any).setImage({
+          src: `rpg://asset/${encodeURIComponent(result.fileName)}`
+        }).run();
         return;
       }
     }
@@ -295,6 +297,16 @@ interface Props {
   onUpdate: (id: string, updatedFields: Partial<RpgModule>) => void;
 }
 
+const normalizeRpgAssetUrls = (html: string) => {
+  return html.replace(/src="rpg:\/\/(?!asset\/)([^"]+)"/g, (_match, fileName) => {
+    const cleanFileName = decodeURIComponent(fileName)
+      .replace(/^\/+/, '')
+      .replace(/\/+$/, '')
+
+    return `src="rpg://asset/${encodeURIComponent(cleanFileName)}"`
+  })
+}
+
 export function TextModule({ moduleData, allModules = [], campaignNodes = [], currentSceneId = '', onUpdate }: Props) {
   const editor = useEditor({
     extensions: [
@@ -306,8 +318,17 @@ export function TextModule({ moduleData, allModules = [], campaignNodes = [], cu
         HTMLAttributes: { class: 'rounded-md border border-slate-700 shadow-md my-4 max-w-full transition-shadow' },
       } as any),
     ],
-    content: moduleData.data.content,
-    onUpdate: ({ editor }) => onUpdate(moduleData.id, { data: { ...moduleData.data, content: editor.getHTML() } }),
+    content: normalizeRpgAssetUrls(moduleData.data.content),
+    onUpdate: ({ editor }) => {
+  const normalizedHtml = normalizeRpgAssetUrls(editor.getHTML())
+
+  onUpdate(moduleData.id, {
+      data: {
+        ...moduleData.data,
+        content: normalizedHtml
+      }
+    })
+  },
     editorProps: { attributes: { class: 'focus:outline-none min-h-[150px]' } },
   });
 

@@ -171,7 +171,8 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
     const url = moduleData.data.filePath;
     if (!url) return null;
     if (url.startsWith('http')) return url;
-    return `rpg://${url}`;
+
+    return `rpg://asset/${encodeURIComponent(url)}`;
   };
 
   const pdfSource = getPdfSource();

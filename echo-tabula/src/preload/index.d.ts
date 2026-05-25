@@ -1,8 +1,6 @@
-import { ElectronAPI } from '@electron-toolkit/preload'
 
 declare global {
   interface Window {
-    electron: ElectronAPI
     api: {
       selectFile: () => Promise<{ success: boolean; path?: string }>
       chooseSavePath: () => Promise<{ success: boolean; path?: string }>
@@ -11,8 +9,13 @@ declare global {
       importAsset: () => Promise<{ success: boolean; fileName?: string; error?: string }>
       importPdf: () => Promise<{ success: boolean; fileName?: string; error?: string }>;
       importImage: () => Promise<{ success: boolean; fileName?: string; error?: string }>;
+      selectFromVault: () => Promise<{
+        success: boolean
+        fileName?: string
+        error?: string
+      }>
 
-      // --- NOVAS FUNÇÕES (Cofre de Campanhas) ---
+      // --- Cofre de Campanhas ---
       listCampaigns: () => Promise<{ success: boolean; files: string[]; error?: string }>;
       saveCampaign: (fileName: string, content: string) => Promise<{ success: boolean; fileName?: string; error?: string }>;
       loadCampaign: (fileName: string) => Promise<{ success: boolean; content?: string; error?: string }>;
@@ -21,7 +24,9 @@ declare global {
 
       // FUNÇÕES DE EXPORTAÇÃO E IMPORTAÇÃO DE CAMPANHA:
       exportCampaign: (fileName: string, tree: any) => Promise<{ success: boolean; error?: string }>;
-  importCampaign: () => Promise<{ success: boolean; fileName?: string; error?: string }>;
+      importCampaign: () => Promise<{ success: boolean; fileName?: string; error?: string }>;
     }
   }
 }
+
+export {}
