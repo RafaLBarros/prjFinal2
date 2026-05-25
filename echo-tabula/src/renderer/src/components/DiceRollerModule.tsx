@@ -1,6 +1,7 @@
 // src/renderer/src/components/DiceRollerModule.tsx
 import { DiceRollerModule as DiceModuleType, RpgModule, DicePreset } from '../types/rpg';
 import { useState, useEffect } from 'react';
+import { moduleEventBus } from '../core/events/moduleEventBus';
 
 interface Props {
   moduleData: DiceModuleType;
@@ -39,66 +40,74 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
 
   // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
   useEffect(() => {
-    const handleModuleAction = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { targetId, action, payload } = customEvent.detail;
-
+    return moduleEventBus.onModuleAction(({ targetId, action, payload }) => {
       if (targetId !== moduleData.id) return;
 
-      if (action === 'rollPreset' && payload?.presetId) {
-        const targetPreset = presets.find(p => p.id === payload.presetId);
-        
+      const actionPayload = payload as { presetId?: string } | null;
+
+      if (action === 'rollPreset' && actionPayload?.presetId) {
+        const targetPreset = presets.find(p => p.id === actionPayload.presetId);
+
         if (targetPreset) {
-          // 1. Carrega os dados do preset na mesa visualmente
           setDiceCounts(targetPreset.dice);
           setModifier(targetPreset.modifier);
-          setRollMode(targetPreset.mode || 'sum'); // 👈 Carrega o modo
-          
+          setRollMode(targetPreset.mode || 'sum');
+
           if (moduleData.isMinimized) {
             onUpdate(moduleData.id, { isMinimized: false });
           }
 
           setTimeout(() => {
             setIsRolling(true);
-            setRollResult(null); 
-            
+            setRollResult(null);
+
             setTimeout(() => {
               const safeModifier = Number(targetPreset.modifier) || 0;
               const modeToRoll = targetPreset.mode || 'sum';
               const details: { face: number; rolls: number[] }[] = [];
-              let allRolls: number[] = []; // Guarda TODOS os dados rolados para achar o maior/menor
-        
+              let allRolls: number[] = [];
+
               diceFaces.forEach(face => {
                 const count = targetPreset.dice[face];
+
                 if (count > 0) {
                   const rolls: number[] = [];
+
                   for (let i = 0; i < count; i++) {
                     const roll = Math.floor(Math.random() * face) + 1;
                     rolls.push(roll);
                     allRolls.push(roll);
                   }
+
                   details.push({ face, rolls });
                 }
               });
-        
-              // 👇 LÓGICA DE CALCULO BASEADA NO MODO
+
               let baseTotal = 0;
-              if (modeToRoll === 'highest') baseTotal = Math.max(...allRolls);
-              else if (modeToRoll === 'lowest') baseTotal = Math.min(...allRolls);
-              else baseTotal = allRolls.reduce((a, b) => a + b, 0);
+
+              if (modeToRoll === 'highest') {
+                baseTotal = Math.max(...allRolls);
+              } else if (modeToRoll === 'lowest') {
+                baseTotal = Math.min(...allRolls);
+              } else {
+                baseTotal = allRolls.reduce((a, b) => a + b, 0);
+              }
 
               const grandTotal = baseTotal + safeModifier;
 
-              setRollResult({ total: grandTotal, modifier: safeModifier, mode: modeToRoll, details });
-              setIsRolling(false); 
+              setRollResult({
+                total: grandTotal,
+                modifier: safeModifier,
+                mode: modeToRoll,
+                details
+              });
+
+              setIsRolling(false);
             }, 600);
-          }, 100); 
+          }, 100);
         }
       }
-    };
-
-    window.addEventListener('rpg-module-action', handleModuleAction);
-    return () => window.removeEventListener('rpg-module-action', handleModuleAction);
+    });
   }, [moduleData.id, moduleData.isMinimized, presets, onUpdate]); 
 
   // --- FUNÇÕES DA MESA ---

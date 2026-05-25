@@ -122,7 +122,7 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
   const QUICK_ICONS = ['🔗', '⚡', '🎵', '⚔️', '🎲', '📕', '👁️', '💬', '🎒', '🔥'];
 
   return (
-    <div className={`flex flex-wrap gap-1 p-1 border-b border-slate-700 bg-slate-900/50 relative transition-all ${showLinkMenu ? 'z-50' : 'z-10'}`}>
+    <div className={`flex flex-wrap gap-1 p-1 border-b border-slate-700 bg-slate-900/50 relative transition-all overflow-visible ${showLinkMenu ? 'z-[1000]' : 'z-10'}`}>
       <MenuButton onClick={() => editor.chain().focus().toggleBold().run()} isActive={editor.isActive('bold')} title="Negrito (Ctrl+B)" icon="B" />
       <MenuButton onClick={() => editor.chain().focus().toggleItalic().run()} isActive={editor.isActive('italic')} title="Itálico (Ctrl+I)" icon="I" />
       <MenuButton onClick={() => editor.chain().focus().toggleStrike().run()} isActive={editor.isActive('strike')} title="Tachado" icon="S" />
@@ -145,7 +145,7 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
         />
 
         {showLinkMenu && (
-          <div className="absolute top-full mt-2 left-0 w-80 bg-slate-800 border border-slate-600 shadow-[0_15px_50px_rgba(0,0,0,0.8)] rounded-md p-4 z-[100] flex flex-col gap-3">
+          <div className="absolute top-full mt-2 left-0 w-80 bg-slate-800 border border-slate-600 shadow-[0_15px_50px_rgba(0,0,0,0.8)] rounded-md p-4 z-[2000] flex flex-col gap-3">
             
             {/* 👇 NOVO: CENA ALVO SEARCHABLE 👇 */}
             <div className="flex flex-col gap-1 relative z-[60]">
@@ -335,7 +335,7 @@ export function TextModule({ moduleData, allModules = [], campaignNodes = [], cu
   if (!moduleData.isActive) return null;
 
   return (
-    <div id={`module-${moduleData.id}`} className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
+    <div id={`module-${moduleData.id}`} className="relative overflow-visible border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500 focus-within:shadow-emerald-900/20">
       <style>{`
         .tiptap p.is-editor-empty:first-child::before { content: attr(data-placeholder); float: left; color: #475569; pointer-events: none; height: 0; }
         .tiptap img.ProseMirror-selectednode { outline: 2px solid #10b981; }

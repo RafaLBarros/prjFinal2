@@ -1,5 +1,6 @@
 // src/renderer/src/components/GlobalAudioPlayer.tsx
 import { useState, useEffect, useRef } from 'react';
+import { moduleEventBus } from '../core/events/moduleEventBus';
 
 interface Track {
   url: string;
@@ -149,55 +150,95 @@ export function GlobalAudioPlayer() {
     (window as any).__globalAudioPlayingUrls = playingUrls;
 
     const interval = setInterval(() => {
-      window.dispatchEvent(new CustomEvent('global-audio-status', { detail: { playingUrls } }));
-    }, 500); 
+      moduleEventBus.emitGlobalAudioStatus({ playingUrls });
+    }, 500);
+
     return () => clearInterval(interval);
   }, [tracks]);
 
   // 2. A CENTRAL DE EVENTOS
   useEffect(() => {
-    const handleAdd = (e: Event) => {
-      const { url, title, volume, loop, restart } = (e as CustomEvent).detail;
+    const offAdd = moduleEventBus.onAddGlobalTrack(({ url, title, volume, loop, restart }) => {
       setTracks(prev => {
         const existingTrack = prev.find(t => t.url === url);
-        if (existingTrack) return prev.map(t => t.url === url ? { ...t, isPlaying: true, restartTrigger: restart ? Date.now() : t.restartTrigger, volume, loop } : t);
-        const newTrack: Track = { url, title, volume, loop, isPlaying: true, restartTrigger: restart ? Date.now() : 0 };
-        if (prev.length >= MAX_TRACKS) return [...prev.slice(1), newTrack]; 
-        return [...prev, newTrack];
-      });
-    };
 
-    const handlePause = (e: Event) => {
-      const { url } = (e as CustomEvent).detail;
-      setTracks(prev => prev.map(t => t.url === url ? { ...t, isPlaying: false } : t));
-    };
+        if (existingTrack) {
+          return prev.map(t =>
+            t.url === url
+              ? {
+                  ...t,
+                  isPlaying: true,
+                  restartTrigger: restart ? Date.now() : t.restartTrigger,
+                  volume: volume ?? t.volume,
+                  loop: loop ?? t.loop
+                }
+              : t
+          );
+        }
 
-    const handleUpdate = (e: Event) => {
-      const { url, volume, loop } = (e as CustomEvent).detail;
-      setTracks(prev => prev.map(t => t.url === url ? { ...t, volume, loop } : t));
-    };
+        const newTrack: Track = {
+          url,
+          title: title || 'Trilha',
+          volume: volume ?? 1,
+          loop: loop ?? true,
+          isPlaying: true,
+          restartTrigger: restart ? Date.now() : 0
+        };
 
-    const handleToggle = (e: Event) => {
-      const { url, title, volume, loop } = (e as CustomEvent).detail;
-      setTracks(prev => {
-        const existingTrack = prev.find(t => t.url === url);
-        if (existingTrack) return prev.map(t => t.url === url ? { ...t, isPlaying: !t.isPlaying } : t);
-        const newTrack: Track = { url, title, volume, loop, isPlaying: true, restartTrigger: 0 };
         if (prev.length >= MAX_TRACKS) return [...prev.slice(1), newTrack];
         return [...prev, newTrack];
       });
-    };
+    });
 
-    window.addEventListener('add-global-track', handleAdd);
-    window.addEventListener('pause-global-track', handlePause);
-    window.addEventListener('update-global-track', handleUpdate);
-    window.addEventListener('toggle-global-track', handleToggle);
+    const offPause = moduleEventBus.onPauseGlobalTrack(({ url }) => {
+      setTracks(prev =>
+        prev.map(t => t.url === url ? { ...t, isPlaying: false } : t)
+      );
+    });
+
+    const offUpdate = moduleEventBus.onUpdateGlobalTrack(({ url, volume, loop }) => {
+      setTracks(prev =>
+        prev.map(t =>
+          t.url === url
+            ? {
+                ...t,
+                volume: volume ?? t.volume,
+                loop: loop ?? t.loop
+              }
+            : t
+        )
+      );
+    });
+
+    const offToggle = moduleEventBus.onToggleGlobalTrack(({ url, title, volume, loop }) => {
+      setTracks(prev => {
+        const existingTrack = prev.find(t => t.url === url);
+
+        if (existingTrack) {
+          return prev.map(t =>
+            t.url === url ? { ...t, isPlaying: !t.isPlaying } : t
+          );
+        }
+
+        const newTrack: Track = {
+          url,
+          title: title || 'Trilha',
+          volume: volume ?? 1,
+          loop: loop ?? true,
+          isPlaying: true,
+          restartTrigger: 0
+        };
+
+        if (prev.length >= MAX_TRACKS) return [...prev.slice(1), newTrack];
+        return [...prev, newTrack];
+      });
+    });
 
     return () => {
-      window.removeEventListener('add-global-track', handleAdd);
-      window.removeEventListener('pause-global-track', handlePause);
-      window.removeEventListener('update-global-track', handleUpdate);
-      window.removeEventListener('toggle-global-track', handleToggle);
+      offAdd();
+      offPause();
+      offUpdate();
+      offToggle();
     };
   }, []);
 

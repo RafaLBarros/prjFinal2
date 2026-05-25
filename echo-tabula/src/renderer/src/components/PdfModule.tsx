@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
+import { moduleEventBus } from '../core/events/moduleEventBus';
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
   'pdfjs-dist/build/pdf.worker.min.mjs',
@@ -178,29 +179,25 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   const pdfSource = getPdfSource();
 
   useEffect(() => {
-    const handleModuleAction = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { targetId, action, payload } = customEvent.detail;
-      
+    return moduleEventBus.onModuleAction(({ targetId, action, payload }) => {
       if (targetId !== moduleData.id) return;
-      
-      if (action === 'openBookmark' && payload?.bookmarkId) {
-        const targetBookmark = bookmarks.find(b => b.id === payload.bookmarkId);
-        
+
+      const actionPayload = payload as { bookmarkId?: string } | null;
+
+      if (action === 'openBookmark' && actionPayload?.bookmarkId) {
+        const targetBookmark = bookmarks.find(b => b.id === actionPayload.bookmarkId);
+
         if (targetBookmark) {
           setInputPage(targetBookmark.page.toString());
           setPendingAutoScroll(true);
-          
-          onUpdate(moduleData.id, { 
+
+          onUpdate(moduleData.id, {
             isMinimized: false,
             data: { ...moduleData.data, page: targetBookmark.page }
           });
         }
       }
-    };
-    
-    window.addEventListener('rpg-module-action', handleModuleAction);
-    return () => window.removeEventListener('rpg-module-action', handleModuleAction);
+    });
   }, [moduleData.id, moduleData.data, bookmarks, onUpdate]);
 
   const handleImportPdf = async () => {

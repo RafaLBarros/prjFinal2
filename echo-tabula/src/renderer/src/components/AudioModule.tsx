@@ -1,6 +1,7 @@
 // src/renderer/src/components/AudioModule.tsx
 import { AudioModule as AudioModuleType, RpgModule } from '../types/rpg';
 import { useState, useEffect } from 'react';
+import { moduleEventBus } from '../core/events/moduleEventBus';
 
 interface Props {
   moduleData: AudioModuleType;
@@ -20,56 +21,62 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
   });
 
   useEffect(() => {
-    const handleStatus = (e: Event) => {
-      const { playingUrls } = (e as CustomEvent).detail;
+    return moduleEventBus.onGlobalAudioStatus(({ playingUrls }) => {
       setIsGloballyPlaying(playingUrls.includes(url));
-    };
-    window.addEventListener('global-audio-status', handleStatus);
-    return () => window.removeEventListener('global-audio-status', handleStatus);
+    });
   }, [url]);
 
   useEffect(() => {
     if (url) {
-      window.dispatchEvent(new CustomEvent('update-global-track', {
-        detail: { url, volume: moduleData.data.volume, loop: moduleData.data.loop }
-      }));
+      moduleEventBus.updateGlobalTrack({
+        url,
+        volume: moduleData.data.volume,
+        loop: moduleData.data.loop
+      });
     }
   }, [moduleData.data.volume, moduleData.data.loop, url]);
 
   // --- FUNÇÕES DE CONTROLE REMOTO ---
   const handlePlayToggle = () => {
-    // 👇 AGORA O MÓDULO SÓ REPASSA A BOLA! O MIXER DECIDE O QUE FAZER 👇
-    window.dispatchEvent(new CustomEvent('toggle-global-track', {
-      detail: { url, title: moduleData.name, volume: moduleData.data.volume, loop: moduleData.data.loop }
-    }));
+    moduleEventBus.toggleGlobalTrack({
+      url,
+      title: moduleData.name,
+      volume: moduleData.data.volume,
+      loop: moduleData.data.loop
+    });
   };
 
   const handleRestart = () => {
-    window.dispatchEvent(new CustomEvent('add-global-track', {
-        detail: { url, title: moduleData.name, volume: moduleData.data.volume, loop: moduleData.data.loop, restart: true }
-    }));
+    moduleEventBus.addGlobalTrack({
+      url,
+      title: moduleData.name,
+      volume: moduleData.data.volume,
+      loop: moduleData.data.loop,
+      restart: true
+    });
   };
 
   useEffect(() => {
-    const handleModuleAction = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { targetId, action } = customEvent.detail;
-
+    return moduleEventBus.onModuleAction(({ targetId, action }) => {
       if (targetId !== moduleData.id) return;
 
       if (action === 'play') {
-        window.dispatchEvent(new CustomEvent('add-global-track', {
-          detail: { url, title: moduleData.name, volume: moduleData.data.volume, loop: moduleData.data.loop }
-        }));
+        moduleEventBus.addGlobalTrack({
+          url,
+          title: moduleData.name,
+          volume: moduleData.data.volume,
+          loop: moduleData.data.loop
+        });
       }
-      if (action === 'pause') window.dispatchEvent(new CustomEvent('pause-global-track', { detail: { url } }));
+
+      if (action === 'pause') {
+        moduleEventBus.pauseGlobalTrack({ url });
+      }
+
       if (action === 'toggle') handlePlayToggle();
       if (action === 'restart') handleRestart();
-    };
-
-    window.addEventListener('rpg-module-action', handleModuleAction);
-    return () => window.removeEventListener('rpg-module-action', handleModuleAction);
-  }, [moduleData.id, url, moduleData.name, moduleData.data.volume, moduleData.data.loop]); // Removemos o isGloballyPlaying da dependência!
+    });
+  }, [moduleData.id, url, moduleData.name, moduleData.data.volume, moduleData.data.loop]);
 
   const importAudio = async () => {
     try {

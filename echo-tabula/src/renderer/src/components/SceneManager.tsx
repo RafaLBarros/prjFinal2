@@ -109,7 +109,7 @@ function SortableModuleWrapper({
       </div>
 
       {/* --- O MÓDULO EM SI --- */}
-      <div className="flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md z-10 hover:z-30 focus-within:z-[60]">
+      <div className="flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md z-10 hover:z-30 focus-within:z-[300]">
         
         {mod.type === 'text' && <TextModule moduleData={mod as TextType} allModules={allModules} campaignNodes={campaignNodes} currentSceneId={currentSceneId} onUpdate={onUpdateModule} />}
         {mod.type === 'audio' && <AudioModule moduleData={mod as AudioType} onUpdate={onUpdateModule} />}
@@ -305,7 +305,7 @@ export function SceneManager({ scene, campaignNodes, onUpdateModules, onRenameSc
       </DndContext>
 
       {/* BARRA INFERIOR */}
-      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur border border-slate-600 p-2.5 rounded-2xl shadow-2xl flex gap-3 z-50 transition-transform hover:scale-105">
+      <div className="absolute bottom-6 left-1/2 -translate-x-1/2 bg-slate-800/95 backdrop-blur border border-slate-600 p-2.5 rounded-2xl shadow-2xl flex gap-3 z-20 transition-transform hover:scale-105">
         <button onClick={() => handleAddModule('text')} className="flex items-center gap-2 px-5 py-2.5 hover:bg-slate-700 rounded-xl transition text-emerald-400 font-medium text-sm">
           <span className="text-xl">📝</span> Texto
         </button>

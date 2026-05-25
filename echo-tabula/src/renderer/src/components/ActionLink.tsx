@@ -1,20 +1,19 @@
 // src/renderer/src/components/ActionLink.tsx
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
+import { moduleEventBus } from '../core/events/moduleEventBus';
 
 const ActionLinkComponent = (props: any) => {
   const { targetId, action, label, payload, icon, preventScroll } = props.node.attrs;
 
   const handleClick = () => {
     // 1. Sempre dispara a ação global
-    window.dispatchEvent(new CustomEvent('rpg-module-action', {
-      detail: { 
-        targetId, 
-        action, 
-        payload: payload ? JSON.parse(payload) : null,
-        preventScroll
-      }
-    }));
+    moduleEventBus.emitModuleAction({
+      targetId,
+      action,
+      payload: payload ? JSON.parse(payload) : null,
+      preventScroll
+    });
 
     // 👇 2. A TRAVA BLINDADA: Aceita tanto o booleano puro quanto a string do HTML
     if (preventScroll === true || preventScroll === 'true') {

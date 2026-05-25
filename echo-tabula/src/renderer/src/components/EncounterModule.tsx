@@ -1,6 +1,7 @@
 // src/renderer/src/components/EncounterModule.tsx
 import { EncounterModule as EncounterModuleType, RpgModule, Combatant, CombatantEffect } from '../types/rpg';
 import { useState, useEffect } from 'react';
+import { moduleEventBus } from '../core/events/moduleEventBus';
 
 interface Props {
   moduleData: EncounterModuleType;
@@ -23,29 +24,29 @@ export function EncounterModule({ moduleData, onUpdate }: Props) {
 
   const combatants: Combatant[] = moduleData.data.combatants || [];
 
-  // 👇 ADICIONE ESTE BLOCO AQUI 👇
   // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
 
   useEffect(() => {
-    const handleModuleAction = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      const { targetId, action } = customEvent.detail;
-
-      // Se o grito não for pra esse módulo, ignora
+    return moduleEventBus.onModuleAction(({ targetId, action }) => {
       if (targetId !== moduleData.id) return;
 
-      // Se a ação for "abrir combate", nós expandimos o módulo
       if (action === 'openEncounter') {
         if (moduleData.isMinimized) {
           onUpdate(moduleData.id, { isMinimized: false });
         }
-      }
-    };
 
-    window.addEventListener('rpg-module-action', handleModuleAction);
-    return () => window.removeEventListener('rpg-module-action', handleModuleAction);
+        const scrollToEncounter = () => {
+          document
+            .getElementById(`module-${moduleData.id}`)
+            ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        };
+
+        setTimeout(scrollToEncounter, 150);
+        setTimeout(scrollToEncounter, 700);
+        setTimeout(scrollToEncounter, 1200);
+      }
+    });
   }, [moduleData.id, moduleData.isMinimized, onUpdate]);
-  // 👆 FIM DO BLOCO 👆
 
   const handleAddCombatant = () => {
     if (!newName.trim() || !newInitiative.trim()) return;
