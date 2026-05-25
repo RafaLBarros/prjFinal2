@@ -5,7 +5,7 @@ import { AudioModule } from '../modules/audio';
 import { PdfModule } from '../modules/pdf';
 import { EncounterModule } from '../modules/encounter';
 import { DiceRollerModule } from '../modules/dice';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 // IMPORTAÇÕES DO DND-KIT
 import { 
@@ -61,6 +61,11 @@ function SortableModuleWrapper({
   hasValuableContent: (mod: RpgModule) => boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: mod.id });
+  const [editingModuleName, setEditingModuleName] = useState(mod.name);
+
+  useEffect(() => {
+    setEditingModuleName(mod.name);
+  }, [mod.name]);
 
   const style = {
     transform: CSS.Transform.toString(transform),

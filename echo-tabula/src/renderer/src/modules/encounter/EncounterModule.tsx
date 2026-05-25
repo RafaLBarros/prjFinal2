@@ -10,6 +10,7 @@ interface Props {
 
 export function EncounterModule({ moduleData, onUpdate }: Props) {
   const [isEditing, setIsEditing] = useState(false);
+  const [draftName, setDraftName] = useState(moduleData.name);
   
   const [newName, setNewName] = useState('');
   const [newInitiative, setNewInitiative] = useState('');
@@ -23,6 +24,24 @@ export function EncounterModule({ moduleData, onUpdate }: Props) {
   const [turnAlerts, setTurnAlerts] = useState<{ name: string; alerts: string[] } | null>(null);
 
   const combatants: Combatant[] = moduleData.data.combatants || [];
+
+  // USE EFFECT PARA RENOMEAR O MÓDULO (SINCRONIZANDO O NOME DO INPUT COM O NOME DO MÓDULO)
+  useEffect(() => {
+    setDraftName(moduleData.name);
+  }, [moduleData.name]);
+
+  const commitName = () => {
+    const trimmedName = draftName.trim();
+
+    if (!trimmedName) {
+      setDraftName(moduleData.name);
+      return;
+    }
+
+    if (trimmedName !== moduleData.name) {
+      onUpdate(moduleData.id, { name: trimmedName });
+    }
+  };
 
   // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
 
@@ -195,7 +214,20 @@ export function EncounterModule({ moduleData, onUpdate }: Props) {
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2 flex-1">
           <span className="text-amber-500">⚔️</span>
-          <input type="text" value={moduleData.name} onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })} className="bg-transparent text-amber-500 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-amber-800" placeholder="Nome do Combate..." />
+          <input type="text" 
+          value={draftName} 
+          onChange={(e) => setDraftName(e.target.value)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur();
+
+            if (e.key === 'Escape') {
+              setDraftName(moduleData.name);
+              e.currentTarget.blur();
+            }
+          }}
+          className="bg-transparent text-amber-500 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-amber-800" 
+          placeholder="Nome do Combate..." />
         </div>
         <button onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })} className="text-slate-500 hover:text-amber-400 px-2 py-1 rounded transition text-sm font-bold">
           {moduleData.isMinimized ? '▼' : '▲'}

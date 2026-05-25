@@ -6,6 +6,7 @@ import { SceneManager } from './components/SceneManager';
 import { GlobalAudioPlayer } from './core/audio/GlobalAudioPlayer';
 import { FloatingModuleManager } from './core/windows/FloatingModuleManager';
 import { useHistoryState } from './core/history/useHistoryState';
+import { moduleEventBus } from './core/events/moduleEventBus';
 
 export default function App() {
   
@@ -13,10 +14,10 @@ export default function App() {
   const {
     state: tree,
     setState: setTree,
-    takeSnapshot,
+    commit,
     undo: handleUndo,
     redo: handleRedo,
-    resetHistory
+    replaceState
   } = useHistoryState<CampaignNode[]>([], { maxHistory: 30 });
 
   const [activeSceneId, setActiveSceneId] = useState<string | null>('s1');
@@ -81,8 +82,7 @@ export default function App() {
         if (result.success && result.content) {
           try {
             const loadedTree = JSON.parse(result.content);
-            setTree(loadedTree);
-            resetHistory();
+            replaceState(loadedTree);
             setCurrentFile(lastFile);
             setActiveSceneId(null);
           } catch (e) {
@@ -123,89 +123,79 @@ export default function App() {
     }
   }, [currentFile]);
 
-  //USE EFFECT PARA TROCAR DE CENA VIA MÓDULOS (O OUVIDO BIÔNICO)
+  // Escuta ações entre cenas e redireciona comandos para o módulo correto.
   useEffect(() => {
-    const handleCrossSceneTeleport = (e: Event) => {
-      const customEvent = e as CustomEvent;
-      // 👇 Agora ele escuta se é pra rodar em 2º plano (preventScroll)
-      const { targetId, action, payload, preventScroll } = customEvent.detail;
-      
-      // Verifica se a ação veio com um bilhete de "Troca de Cena"
-      if (payload?.targetSceneId && payload.targetSceneId !== activeSceneId) {
-        
-        // ========================================================
-        // 👇 O NOVO MOTOR DE BACKGROUND (ÁUDIO SEM MUDAR DE TELA) 👇
-        // ========================================================
-        if (preventScroll === true || preventScroll === 'true') {
-          
-          // Função recursiva que RETORNA o módulo (TypeScript adora isso)
-          const findModuleInTree = (nodes: CampaignNode[], id: string): RpgModule | null => {
-            for (const node of nodes) {
-              if (node.type === 'scene' && node.modules) {
-                const m = node.modules.find(mod => mod.id === id);
-                if (m) return m;
-              }
-              if (node.children) {
-                const found = findModuleInTree(node.children, id);
-                if (found) return found;
-              }
+    return moduleEventBus.onModuleAction(({ targetId, action, payload, preventScroll }) => {
+      const actionPayload = payload as { targetSceneId?: string } | null;
+
+      if (!actionPayload?.targetSceneId || actionPayload.targetSceneId === activeSceneId) {
+        return;
+      }
+
+      if (preventScroll === true || preventScroll === 'true') {
+        const findModuleInTree = (nodes: CampaignNode[], id: string): RpgModule | null => {
+          for (const node of nodes) {
+            if (node.type === 'scene' && node.modules) {
+              const foundModule = node.modules.find(mod => mod.id === id);
+              if (foundModule) return foundModule;
             }
-            return null;
-          };
 
-          // Agora o TypeScript sabe exatamente o que é o foundModule!
-          const foundModule = findModuleInTree(tree, targetId);
-
-          if (foundModule && foundModule.type === 'audio') {
-            // Traduz o comando do botão para o idioma do Mixer Global
-            let globalAction = 'toggle-global-track';
-            if (action === 'play') globalAction = 'add-global-track';
-            if (action === 'pause') globalAction = 'pause-global-track';
-            if (action === 'restart') globalAction = 'add-global-track'; 
-
-            // Dá o Play/Pause direto na caixa de som flutuante!
-            window.dispatchEvent(new CustomEvent(globalAction, {
-              detail: {
-                url: foundModule.data.urlOrPath,
-                title: foundModule.name,
-                volume: foundModule.data.volume,
-                loop: foundModule.data.loop,
-                restart: action === 'restart'
-              }
-            }));
+            if (node.children) {
+              const foundModule = findModuleInTree(node.children, id);
+              if (foundModule) return foundModule;
+            }
           }
 
-          return; // 🛑 ABORTA A VIAGEM! O Mestre continua na tela atual tranquilamente.
-        }
-
-        // ========================================================
-        // --- VIAGEM NORMAL (Se a caixa não estiver marcada) ---
-        // ========================================================
-        setActiveSceneId(payload.targetSceneId);
-        
-        let attempts = 0;
-        
-        const tryDispatch = () => {
-          const targetEl = document.getElementById(`module-${targetId}`);
-          if (targetEl) {
-            setTimeout(() => {
-              window.dispatchEvent(new CustomEvent('rpg-module-action', {
-                detail: { targetId, action, payload }
-              }));
-            }, 50);
-          } else if (attempts < 20) {
-            attempts++;
-            setTimeout(tryDispatch, 50);
-          }
+          return null;
         };
 
-        setTimeout(tryDispatch, 50);
-      }
-    };
+        const foundModule = findModuleInTree(tree, targetId);
 
-    window.addEventListener('rpg-module-action', handleCrossSceneTeleport);
-    return () => window.removeEventListener('rpg-module-action', handleCrossSceneTeleport);
-  }, [activeSceneId, tree]); // 👈 ATENÇÃO: Adicionei o 'tree' aqui para ele achar as músicas sempre atualizadas!
+        if (foundModule?.type === 'audio') {
+          const trackPayload = {
+            url: foundModule.data.urlOrPath,
+            title: foundModule.name,
+            volume: foundModule.data.volume,
+            loop: foundModule.data.loop,
+            restart: action === 'restart'
+          };
+
+          if (action === 'play' || action === 'restart') {
+            moduleEventBus.addGlobalTrack(trackPayload);
+          } else if (action === 'pause') {
+            moduleEventBus.pauseGlobalTrack({ url: foundModule.data.urlOrPath });
+          } else {
+            moduleEventBus.toggleGlobalTrack(trackPayload);
+          }
+        }
+
+        return;
+      }
+
+      setActiveSceneId(actionPayload.targetSceneId);
+
+      let attempts = 0;
+
+      const tryDispatch = () => {
+        const targetEl = document.getElementById(`module-${targetId}`);
+
+        if (targetEl) {
+          setTimeout(() => {
+            moduleEventBus.emitModuleAction({
+              targetId,
+              action,
+              payload
+            });
+          }, 50);
+        } else if (attempts < 20) {
+          attempts++;
+          setTimeout(tryDispatch, 50);
+        }
+      };
+
+      setTimeout(tryDispatch, 50);
+    });
+  }, [activeSceneId, tree]);
 
   // --- FUNÇÕES DE CONTROLE DA ÁRVORE ---
 
@@ -225,8 +215,6 @@ export default function App() {
   };
 
   const handleAddNode = (parentId: string | null, type: 'folder' | 'scene') => {
-    takeSnapshot(); // 📸 SNAPSHOT AQUI
-    
     const newNode: CampaignNode = {
       id: Math.random().toString(36).substr(2, 9),
       type,
@@ -234,20 +222,31 @@ export default function App() {
       ...(type === 'folder' ? { isOpen: true, children: [] } : {})
     };
 
-    if (parentId === null) {
-      setTree([...tree, newNode]);
-    } else {
+    commit(prevTree => {
+      if (parentId === null) {
+        return [...prevTree, newNode];
+      }
+
       const addNodeToParent = (nodes: CampaignNode[]): CampaignNode[] => {
         return nodes.map(node => {
           if (node.id === parentId && node.type === 'folder') {
-            return { ...node, isOpen: true, children: [...(node.children || []), newNode] };
+            return {
+              ...node,
+              isOpen: true,
+              children: [...(node.children || []), newNode]
+            };
           }
-          if (node.children) return { ...node, children: addNodeToParent(node.children) };
+
+          if (node.children) {
+            return { ...node, children: addNodeToParent(node.children) };
+          }
+
           return node;
         });
       };
-      setTree(addNodeToParent(tree));
-    }
+
+      return addNodeToParent(prevTree);
+    });
   };
 
   // 1. Apenas abre o modal de confirmação
@@ -258,21 +257,28 @@ export default function App() {
   // 2. Executa a exclusão de fato
   const executeDeleteNode = () => {
     if (!nodeToDelete) return;
-    
-    takeSnapshot(); // 📸 SNAPSHOT AQUI
 
-    const deleteFromTree = (nodes: CampaignNode[]): CampaignNode[] => {
-      return nodes
-        .filter(node => node.id !== nodeToDelete) 
-        .map(node => {
-          if (node.children) return { ...node, children: deleteFromTree(node.children) }; 
-          return node;
-        });
-    };
-    
-    setTree(deleteFromTree(tree));
-    if (activeSceneId === nodeToDelete) setActiveSceneId(null); 
-    setNodeToDelete(null); 
+    commit(prevTree => {
+      const deleteFromTree = (nodes: CampaignNode[]): CampaignNode[] => {
+        return nodes
+          .filter(node => node.id !== nodeToDelete)
+          .map(node => {
+            if (node.children) {
+              return { ...node, children: deleteFromTree(node.children) };
+            }
+
+            return node;
+          });
+      };
+
+      return deleteFromTree(prevTree);
+    });
+
+    if (activeSceneId === nodeToDelete) {
+      setActiveSceneId(null);
+    }
+
+    setNodeToDelete(null);
   };
 
   // --- FUNÇÃO AUXILIAR: DETECTOR DE PARADOXO ---
@@ -304,77 +310,115 @@ export default function App() {
   };
 
   // --- FUNÇÃO ATUALIZADA: MOVER NÓ COM REORDENAÇÃO ---
-  const handleMoveNode = (draggedId: string, targetId: string | null, position: 'before' | 'after' | 'inside' = 'inside') => {
+  const handleMoveNode = (
+    draggedId: string,
+    targetId: string | null,
+    position: 'before' | 'after' | 'inside' = 'inside'
+  ) => {
     if (draggedId === targetId) return;
-    if (targetId && isDescendant(tree, draggedId, targetId)) return; 
-    
-    takeSnapshot(); // 📸 SNAPSHOT AQUI
-    
-    let draggedNode: CampaignNode | null = null;
+    if (targetId && isDescendant(tree, draggedId, targetId)) return;
 
-    const removeNode = (nodes: CampaignNode[]): CampaignNode[] => {
-      return nodes.filter(node => {
-        if (node.id === draggedId) { draggedNode = node; return false; }
-        if (node.children) node.children = removeNode(node.children);
-        return true;
-      });
-    };
+    commit(prevTree => {
+      let draggedNode: CampaignNode | null = null;
 
-    let newTree = removeNode([...tree]);
-    if (!draggedNode) return;
+      const removeNode = (nodes: CampaignNode[]): CampaignNode[] => {
+        return nodes
+          .filter(node => {
+            if (node.id === draggedId) {
+              draggedNode = node;
+              return false;
+            }
 
-    if (targetId === null) {
-      newTree.push(draggedNode); 
-    } else {
+            return true;
+          })
+          .map(node => {
+            if (node.children) {
+              return { ...node, children: removeNode(node.children) };
+            }
+
+            return node;
+          });
+      };
+
+      let newTree = removeNode(prevTree);
+
+      if (!draggedNode) return prevTree;
+
+      if (targetId === null) {
+        return [...newTree, draggedNode];
+      }
+
       const insertNode = (nodes: CampaignNode[]): CampaignNode[] => {
         const result: CampaignNode[] = [];
+
         for (const node of nodes) {
           if (node.id === targetId) {
             if (position === 'before') result.push(draggedNode!);
+
             if (position === 'inside' && node.type === 'folder') {
-              result.push({ ...node, isOpen: true, children: [...(node.children || []), draggedNode!] });
+              result.push({
+                ...node,
+                isOpen: true,
+                children: [...(node.children || []), draggedNode!]
+              });
             } else {
-              result.push(node); 
+              result.push(node);
             }
+
             if (position === 'after') result.push(draggedNode!);
           } else {
-            if (node.children) result.push({ ...node, children: insertNode(node.children) });
-            else result.push(node);
+            if (node.children) {
+              result.push({ ...node, children: insertNode(node.children) });
+            } else {
+              result.push(node);
+            }
           }
         }
+
         return result;
       };
-      newTree = insertNode(newTree);
-    }
-    setTree(newTree);
+
+      return insertNode(newTree);
+    });
   };
 
   const handleRenameNode = (targetId: string, newName: string) => {
-    takeSnapshot(); // 📸 SNAPSHOT AQUI
-    
-    const renameInTree = (nodes: CampaignNode[]): CampaignNode[] => {
-      return nodes.map(node => {
-        if (node.id === targetId) return { ...node, name: newName }; 
-        if (node.children) return { ...node, children: renameInTree(node.children) }; 
-        return node;
-      });
-    };
-    setTree(renameInTree(tree));
+    commit(prevTree => {
+      const renameInTree = (nodes: CampaignNode[]): CampaignNode[] => {
+        return nodes.map(node => {
+          if (node.id === targetId) return { ...node, name: newName };
+
+          if (node.children) {
+            return { ...node, children: renameInTree(node.children) };
+          }
+
+          return node;
+        });
+      };
+
+      return renameInTree(prevTree);
+    });
   };
 
   const handleTogglePin = (targetId: string) => {
-    takeSnapshot(); // 📸 SNAPSHOT AQUI
-    
-    const togglePinInTree = (nodes: CampaignNode[]): CampaignNode[] => {
-      return nodes.map(node => {
-        if (node.id === targetId) return { ...node, isPinned: !node.isPinned };
-        if (node.children) return { ...node, children: togglePinInTree(node.children) };
-        return node;
-      });
-    };
-    setTree(togglePinInTree(tree));
-  };
+    commit(prevTree => {
+      const togglePinInTree = (nodes: CampaignNode[]): CampaignNode[] => {
+        return nodes.map(node => {
+          if (node.id === targetId) {
+            return { ...node, isPinned: !node.isPinned };
+          }
 
+          if (node.children) {
+            return { ...node, children: togglePinInTree(node.children) };
+          }
+
+          return node;
+        });
+      };
+
+      return togglePinInTree(prevTree);
+    });
+  };
 
   // --- FUNÇÕES DE GERENCIAMENTO DE CAMPANHA ---
 
@@ -402,8 +446,7 @@ export default function App() {
     const result = await window.api.saveCampaign(fileName, dataToSave);
     
     if (result.success && result.fileName) {
-      setTree(emptyTree);
-      resetHistory();
+      replaceState(emptyTree);
       setActiveSceneId(null);
       setCurrentFile(result.fileName);
       setIsSaveOpen(false);
@@ -425,8 +468,7 @@ export default function App() {
     if (result.success && result.content) {
       try {
         const loadedTree = JSON.parse(result.content);
-        setTree(loadedTree);
-        resetHistory();
+        replaceState(loadedTree);
         setCurrentFile(fileName);
         setActiveSceneId(null);
         setIsLoadOpen(false);
@@ -445,7 +487,7 @@ export default function App() {
       setCampaignToDelete(null); 
       
       if (currentFile === fileName) {
-        setTree([]);
+        replaceState([]);
         setActiveSceneId(null);
         setCurrentFile(null);
 
@@ -489,17 +531,24 @@ export default function App() {
 
   const activeScene = activeSceneId ? getActiveScene(tree) : null;
 
-  const handleUpdateSceneModules = (sceneId: string, newModules: any[]) => {
-    takeSnapshot(); // 📸 SNAPSHOT AQUI (Protege Criação, Reordenação e Exclusão de módulos na cena)
-    
-    const updateModulesInTree = (nodes: CampaignNode[]): CampaignNode[] => {
-      return nodes.map(node => {
-        if (node.id === sceneId && node.type === 'scene') return { ...node, modules: newModules };
-        if (node.children) return { ...node, children: updateModulesInTree(node.children) };
-        return node;
-      });
-    };
-    setTree(updateModulesInTree(tree));
+  const handleUpdateSceneModules = (sceneId: string, newModules: RpgModule[]) => {
+    commit(prevTree => {
+      const updateModulesInTree = (nodes: CampaignNode[]): CampaignNode[] => {
+        return nodes.map(node => {
+          if (node.id === sceneId && node.type === 'scene') {
+            return { ...node, modules: newModules };
+          }
+
+          if (node.children) {
+            return { ...node, children: updateModulesInTree(node.children) };
+          }
+
+          return node;
+        });
+      };
+
+      return updateModulesInTree(prevTree);
+    });
   };
 
   // --- FUNÇÕES DE EXPORTAÇÃO E IMPORTAÇÃO ---
@@ -532,16 +581,21 @@ export default function App() {
   };
 
   const handleChangeNodeIcon = (targetId: string, newIcon: string) => {
-    takeSnapshot(); // 📸 SNAPSHOT AQUI
-    
-    const updateIconInTree = (nodes: CampaignNode[]): CampaignNode[] => {
-      return nodes.map(node => {
-        if (node.id === targetId) return { ...node, icon: newIcon };
-        if (node.children) return { ...node, children: updateIconInTree(node.children) };
-        return node;
-      });
-    };
-    setTree(updateIconInTree(tree));
+    commit(prevTree => {
+      const updateIconInTree = (nodes: CampaignNode[]): CampaignNode[] => {
+        return nodes.map(node => {
+          if (node.id === targetId) return { ...node, icon: newIcon };
+
+          if (node.children) {
+            return { ...node, children: updateIconInTree(node.children) };
+          }
+
+          return node;
+        });
+      };
+
+      return updateIconInTree(prevTree);
+    });
   };
 
   // 👇 CORREÇÃO 3: Função Global usando o setTree correto! 👇

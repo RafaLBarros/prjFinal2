@@ -35,6 +35,8 @@ const createAccentInsensitiveRegex = (searchTerm: string) => {
 
 export function PdfModule({ moduleData, onUpdate }: Props) {
   const [isEditing, setIsEditing] = useState(false);
+  const [draftName, setDraftName] = useState(moduleData.name);
+
   const [numPages, setNumPages] = useState<number>();
   const [inputPage, setInputPage] = useState(moduleData.data.page.toString());
   const [isAddingBookmark, setIsAddingBookmark] = useState(false);
@@ -55,6 +57,24 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   const bookmarks: { id: string, name: string, page: number }[] = moduleData.data.bookmarks || [];
   // Usa "as any" para evitar erro no TypeScript caso a propriedade não esteja tipada no RPG.ts
   const isBookmarksMinimized = (moduleData.data as any).isBookmarksMinimized || false;
+
+  // USE EFFECT PARA RENOMEAR O MÓDULO (SINCRONIZANDO O NOME DO INPUT COM O NOME DO MÓDULO)
+  useEffect(() => {
+    setDraftName(moduleData.name);
+  }, [moduleData.name]);
+
+  const commitName = () => {
+    const trimmedName = draftName.trim();
+
+    if (!trimmedName) {
+      setDraftName(moduleData.name);
+      return;
+    }
+
+    if (trimmedName !== moduleData.name) {
+      onUpdate(moduleData.id, { name: trimmedName });
+    }
+  };
 
   // --- MOTOR DE BUSCA GLOBAL ---
   const executeGlobalSearch = async (e?: React.FormEvent) => {
@@ -223,8 +243,17 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
           <span className="text-red-400">📕</span>
           <input 
             type="text"
-            value={moduleData.name}
-            onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })}
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+
+              if (e.key === 'Escape') {
+                setDraftName(moduleData.name);
+                e.currentTarget.blur();
+              }
+            }}
             className="bg-transparent text-red-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-red-800"
             placeholder="Nome do Livro"
           />

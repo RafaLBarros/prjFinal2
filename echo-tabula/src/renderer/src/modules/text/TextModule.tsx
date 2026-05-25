@@ -31,6 +31,7 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
   const [preventScroll, setPreventScroll] = useState(false);
 
   const menuRef = useRef<HTMLDivElement>(null); 
+  
 
   useEffect(() => {
     if (!editor) return;
@@ -308,6 +309,27 @@ const normalizeRpgAssetUrls = (html: string) => {
 }
 
 export function TextModule({ moduleData, allModules = [], campaignNodes = [], currentSceneId = '', onUpdate }: Props) {
+
+  const [draftName, setDraftName] = useState(moduleData.name);
+
+  // USE EFFECT PARA RENOMEAR O MÓDULO (SINCRONIZANDO O NOME DO INPUT COM O NOME DO MÓDULO)
+  useEffect(() => {
+    setDraftName(moduleData.name);
+  }, [moduleData.name]);
+
+  const commitName = () => {
+    const trimmedName = draftName.trim();
+
+    if (!trimmedName) {
+      setDraftName(moduleData.name);
+      return;
+    }
+
+    if (trimmedName !== moduleData.name) {
+      onUpdate(moduleData.id, { name: trimmedName });
+    }
+  };
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -320,15 +342,15 @@ export function TextModule({ moduleData, allModules = [], campaignNodes = [], cu
     ],
     content: normalizeRpgAssetUrls(moduleData.data.content),
     onUpdate: ({ editor }) => {
-  const normalizedHtml = normalizeRpgAssetUrls(editor.getHTML())
+      const normalizedHtml = normalizeRpgAssetUrls(editor.getHTML());
 
-  onUpdate(moduleData.id, {
-      data: {
-        ...moduleData.data,
-        content: normalizedHtml
-      }
-    })
-  },
+      onUpdate(moduleData.id, {
+        data: {
+          ...moduleData.data,
+          content: normalizedHtml
+        }
+      });
+    },
     editorProps: { attributes: { class: 'focus:outline-none min-h-[150px]' } },
   });
 
@@ -347,7 +369,18 @@ export function TextModule({ moduleData, allModules = [], campaignNodes = [], cu
         <div className="flex items-center gap-2 flex-1">
           <span className="text-emerald-400">📝</span>
           <input 
-            type="text" value={moduleData.name} onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })}
+            type="text" 
+            value={draftName} 
+            onChange={(e) => setDraftName(e.target.value)} 
+            onBlur={commitName} 
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+
+              if (e.key === 'Escape') {
+                setDraftName(moduleData.name);
+                e.currentTarget.blur();
+              }
+            }}
             className="bg-transparent text-emerald-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-emerald-700"
             placeholder="Título da Nota..."
           />

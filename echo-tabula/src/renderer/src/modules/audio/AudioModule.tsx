@@ -11,8 +11,26 @@ interface Props {
 export function AudioModule({ moduleData, onUpdate }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [draftName, setDraftName] = useState(moduleData.name);
   
   const url = moduleData.data.urlOrPath || "";
+
+  useEffect(() => {
+    setDraftName(moduleData.name);
+  }, [moduleData.name]);
+
+  const commitName = () => {
+    const trimmedName = draftName.trim();
+
+    if (!trimmedName) {
+      setDraftName(moduleData.name);
+      return;
+    }
+
+    if (trimmedName !== moduleData.name) {
+      onUpdate(moduleData.id, { name: trimmedName });
+    }
+  };
 
   // 👇 LÊ A COLINHA NA INICIALIZAÇÃO! (Fim da amnésia visual) 👇
   const [isGloballyPlaying, setIsGloballyPlaying] = useState(() => {
@@ -125,7 +143,22 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2 flex-1">
           <span className="text-blue-400">🎵</span>
-          <input type="text" value={moduleData.name} onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })} className="bg-transparent text-blue-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-blue-800" placeholder="Nome da Trilha" />
+          <input
+            type="text"
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+
+              if (e.key === 'Escape') {
+                setDraftName(moduleData.name);
+                e.currentTarget.blur();
+              }
+            }}
+            className="bg-transparent text-blue-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-blue-800"
+            placeholder="Nome da Trilha"
+          />
         </div>
         <button onClick={() => onUpdate(moduleData.id, { isMinimized: !moduleData.isMinimized })} className="text-slate-500 hover:text-blue-400 px-2 py-1 rounded text-sm font-bold">{moduleData.isMinimized ? '▼' : '▲'}</button>
         <button onClick={() => setIsEditing(!isEditing)} className="text-slate-400 hover:text-white text-sm bg-slate-700 px-2 py-1 rounded ml-2">{isEditing ? 'Ocultar Config' : '⚙️ Configurar'}</button>

@@ -4,79 +4,122 @@ interface UseHistoryStateOptions {
   maxHistory?: number;
 }
 
+interface HistoryState<T> {
+  past: T[];
+  present: T;
+  future: T[];
+}
+
 export function useHistoryState<T>(
   initialState: T,
   options: UseHistoryStateOptions = {}
 ) {
   const { maxHistory = 30 } = options;
 
-  const [state, setStateBase] = useState<T>(initialState);
-  const [pastStates, setPastStates] = useState<T[]>([]);
-  const [futureStates, setFutureStates] = useState<T[]>([]);
-
-  const takeSnapshot = useCallback(() => {
-    setPastStates(prev => {
-      const newHistory = [...prev, state];
-      return newHistory.length > maxHistory
-        ? newHistory.slice(newHistory.length - maxHistory)
-        : newHistory;
-    });
-
-    setFutureStates([]);
-  }, [state, maxHistory]);
-
+  const [history, setHistory] = useState<HistoryState<T>>({
+    past: [],
+    present: initialState,
+    future: []
+  });
 
   const setState = useCallback((nextState: T | ((prev: T) => T)) => {
-    setStateBase(prev => {
-      if (typeof nextState === 'function') {
-        return (nextState as (prev: T) => T)(prev);
-      }
+    setHistory(prevHistory => {
+      const nextPresent =
+        typeof nextState === 'function'
+          ? (nextState as (prev: T) => T)(prevHistory.present)
+          : nextState;
 
-      return nextState;
+      return {
+        ...prevHistory,
+        present: nextPresent
+      };
     });
   }, []);
 
-  const undo = useCallback(() => {
-    setPastStates(prevPast => {
-      if (prevPast.length === 0) return prevPast;
+  const commit = useCallback((nextState: T | ((prev: T) => T)) => {
+    setHistory(prevHistory => {
+      const nextPresent =
+        typeof nextState === 'function'
+          ? (nextState as (prev: T) => T)(prevHistory.present)
+          : nextState;
 
-      const previousState = prevPast[prevPast.length - 1];
+      const newPast = [...prevHistory.past, prevHistory.present];
+      const limitedPast =
+        newPast.length > maxHistory
+          ? newPast.slice(newPast.length - maxHistory)
+          : newPast;
 
-      setFutureStates(prevFuture => [state, ...prevFuture]);
-      setStateBase(previousState);
-
-      return prevPast.slice(0, prevPast.length - 1);
+      return {
+        past: limitedPast,
+        present: nextPresent,
+        future: []
+      };
     });
-  }, [state]);
+  }, [maxHistory]);
+
+  const undo = useCallback(() => {
+    setHistory(prevHistory => {
+      if (prevHistory.past.length === 0) return prevHistory;
+
+      const previous = prevHistory.past[prevHistory.past.length - 1];
+      const newPast = prevHistory.past.slice(0, prevHistory.past.length - 1);
+
+      return {
+        past: newPast,
+        present: previous,
+        future: [prevHistory.present, ...prevHistory.future]
+      };
+    });
+  }, []);
 
   const redo = useCallback(() => {
-    setFutureStates(prevFuture => {
-      if (prevFuture.length === 0) return prevFuture;
+    setHistory(prevHistory => {
+      if (prevHistory.future.length === 0) return prevHistory;
 
-      const nextState = prevFuture[0];
+      const next = prevHistory.future[0];
+      const newFuture = prevHistory.future.slice(1);
 
-      setPastStates(prevPast => [...prevPast, state]);
-      setStateBase(nextState);
+      const newPast = [...prevHistory.past, prevHistory.present];
+      const limitedPast =
+        newPast.length > maxHistory
+          ? newPast.slice(newPast.length - maxHistory)
+          : newPast;
 
-      return prevFuture.slice(1);
+      return {
+        past: limitedPast,
+        present: next,
+        future: newFuture
+      };
     });
-  }, [state]);
+  }, [maxHistory]);
 
   const resetHistory = useCallback(() => {
-    setPastStates([]);
-    setFutureStates([]);
+    setHistory(prevHistory => ({
+      past: [],
+      present: prevHistory.present,
+      future: []
+    }));
+  }, []);
+
+  const replaceState = useCallback((nextState: T) => {
+    setHistory({
+      past: [],
+      present: nextState,
+      future: []
+    });
   }, []);
 
   return {
-    state,
+    state: history.present,
     setState,
-    takeSnapshot,
+    commit,
     undo,
     redo,
     resetHistory,
-    canUndo: pastStates.length > 0,
-    canRedo: futureStates.length > 0,
-    pastStates,
-    futureStates
+    replaceState,
+    canUndo: history.past.length > 0,
+    canRedo: history.future.length > 0,
+    pastStates: history.past,
+    futureStates: history.future
   };
 }

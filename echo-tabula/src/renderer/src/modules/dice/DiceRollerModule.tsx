@@ -19,6 +19,7 @@ interface RollResult {
 
 export function DiceRollerModule({ moduleData, onUpdate }: Props) {
   const [isEditing, setIsEditing] = useState(false);
+  const [draftName, setDraftName] = useState(moduleData.name);
 
   // --- ESTADOS DO MOTOR ---
   const [diceCounts, setDiceCounts] = useState<Record<number, number>>({
@@ -37,6 +38,24 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
 
   const diceFaces = [4, 6, 8, 10, 12, 20, 100];
   const presets: DicePreset[] = moduleData.data.presets || [];
+
+  // USE EFFECT PARA RENOMEAR O MÓDULO (SINCRONIZANDO O NOME DO INPUT COM O NOME DO MÓDULO)
+  useEffect(() => {
+    setDraftName(moduleData.name);
+  }, [moduleData.name]);
+
+  const commitName = () => {
+    const trimmedName = draftName.trim();
+
+    if (!trimmedName) {
+      setDraftName(moduleData.name);
+      return;
+    }
+
+    if (trimmedName !== moduleData.name) {
+      onUpdate(moduleData.id, { name: trimmedName });
+    }
+  };
 
   // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
   useEffect(() => {
@@ -228,8 +247,17 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
           <span className="text-indigo-400">🎲</span>
           <input 
             type="text"
-            value={moduleData.name}
-            onChange={(e) => onUpdate(moduleData.id, { name: e.target.value })}
+            value={draftName}
+            onChange={(e) => setDraftName(e.target.value)}
+            onBlur={commitName}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') e.currentTarget.blur();
+
+              if (e.key === 'Escape') {
+                setDraftName(moduleData.name);
+                e.currentTarget.blur();
+              }
+            }}
             className="bg-transparent text-indigo-400 font-bold focus:outline-none px-2 py-1 rounded w-full transition placeholder:text-indigo-800"
             placeholder="Mesa de Dados"
           />
