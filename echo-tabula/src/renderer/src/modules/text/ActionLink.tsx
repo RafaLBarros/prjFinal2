@@ -7,7 +7,7 @@ const ActionLinkComponent = (props: any) => {
   const { targetId, action, label, payload, icon, preventScroll } = props.node.attrs;
 
   const handleClick = () => {
-    // 1. Sempre dispara a ação global
+    // Emite o evento global para que o módulo alvo possa reagir à ação.
     moduleEventBus.emitModuleAction({
       targetId,
       action,
@@ -15,12 +15,10 @@ const ActionLinkComponent = (props: any) => {
       preventScroll
     });
 
-    // 👇 2. A TRAVA BLINDADA: Aceita tanto o booleano puro quanto a string do HTML
     if (preventScroll === true || preventScroll === 'true') {
       return; 
     }
 
-    // 3. Caso contrário, faz a rolagem visual normal
     setTimeout(() => {
       const targetElement = document.getElementById(`module-${targetId}`);
       if (targetElement) {
@@ -69,7 +67,6 @@ export const ActionLink = Node.create({
       payload: { default: null }, 
       icon: { default: '🔗' }, 
       
-      // 👇 A MÁGICA ACONTECE AQUI: Ensinamos o TipTap a ler e escrever HTML corretamente
       preventScroll: { 
         default: false,
         parseHTML: element => element.getAttribute('data-prevent-scroll') === 'true',

@@ -17,7 +17,6 @@ interface Props {
   onUpdate: (id: string, updatedFields: Partial<RpgModule>) => void;
 }
 
-// --- FUNÇÃO AUXILIAR: Regex Inteligente que ignora acentos ---
 const createAccentInsensitiveRegex = (searchTerm: string) => {
   const normalizedSearch = searchTerm.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
   
@@ -44,7 +43,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   const [newBookmarkName, setNewBookmarkName] = useState('');
   const [pendingAutoScroll, setPendingAutoScroll] = useState(false);
 
-  // --- ESTADOS DO MOTOR DE BUSCA ---
+  // Estados de busca
   const [searchText, setSearchText] = useState('');
   const [submittedSearch, setSubmittedSearch] = useState(''); 
   const [isSearching, setIsSearching] = useState(false);
@@ -56,10 +55,9 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   const pdfDocRef = useRef<any>(null);
 
   const bookmarks: { id: string, name: string, page: number }[] = moduleData.data.bookmarks || [];
-  // Usa "as any" para evitar erro no TypeScript caso a propriedade não esteja tipada no RPG.ts
   const isBookmarksMinimized = (moduleData.data as any).isBookmarksMinimized || false;
 
-  // USE EFFECT PARA RENOMEAR O MÓDULO (SINCRONIZANDO O NOME DO INPUT COM O NOME DO MÓDULO)
+  // Sincroniza o nome do módulo com o estado local para edição.
   useEffect(() => {
     setDraftName(moduleData.name);
   }, [moduleData.name]);
@@ -77,7 +75,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
     }
   };
 
-  // --- MOTOR DE BUSCA GLOBAL ---
+  // Função para buscar no PDF, com suporte a acentos e realce visual.
   const executeGlobalSearch = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
@@ -139,7 +137,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
     jumpToPage(searchResults[prevIndex]);
   };
 
-  // --- RENDERIZADOR DE TEXTO (MARCA-TEXTO TRANSLÚCIDO) ---
+  // Função para marcar o resultado da busca na renderização do texto do PDF.
   const textRenderer = useCallback((textItem: any) => {
     if (!submittedSearch || searchResults.length === 0) return textItem.str;
     
@@ -152,7 +150,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
     );
   }, [submittedSearch, searchResults]);
 
-  // --- FUNÇÕES NORMAIS DO MÓDULO ---
+  // Funções de navegação de página e gerenciamento de marca-páginas.
   const jumpToPage = (pageNumber: number) => {
     setInputPage(pageNumber.toString());
     onUpdate(moduleData.id, { data: { ...moduleData.data, page: pageNumber } });
@@ -238,7 +236,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
   return (
     <div id={`module-${moduleData.id}`} className="border border-slate-700 bg-slate-800 rounded-md shadow-md mb-4 flex flex-col transition-all focus-within:border-emerald-500">
       
-      {/* --- CABEÇALHO --- */}
+      {/* CABEÇALHO */}
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2 flex-1">
           <span className="text-red-400">📕</span>
@@ -271,7 +269,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
 
       {!moduleData.isMinimized && (
         <>
-          {/* --- CONFIGURAÇÕES --- */}
+          {/* CONFIGURAÇÕES */}
           {isEditing && (
             <div className="bg-slate-900 p-4 border-b border-slate-700 flex flex-col items-start gap-2">
               <label className="block text-xs text-slate-400 mb-1">Arquivo atual: <span className="text-emerald-400 font-mono">{moduleData.data.filePath || 'Nenhum'}</span></label>
@@ -284,7 +282,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
             </div>
           )}
 
-          {/* 👇 NOVA SEÇÃO RETRÁTIL DE MARCA-PÁGINAS 👇 */}
+          {/* MARCA-PÁGINAS */}
           {moduleData.data.filePath && (
             <div className="bg-slate-900/80 border-b border-slate-700 flex flex-col">
               <div 
@@ -345,13 +343,13 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
             </div>
           )}
 
-          {/* --- CORPO DO PDF --- */}
+          {/* CONTEÚDO PRINCIPAL */}
           <div className="p-4 flex flex-col items-center bg-slate-950 overflow-hidden relative">
             
             {moduleData.data.filePath && (
               <div className="flex flex-col items-center w-full max-w-2xl mb-4 gap-3 z-10">
                 
-                {/* --- BARRA DE BUSCA FUZZY --- */}
+                {/* BARRA DE BUSCA */}
                 <div className="w-full bg-slate-900 border border-slate-700 p-2 rounded-lg flex items-center gap-2 shadow-inner focus-within:border-red-500 transition-colors">
                   <span className="text-slate-400 ml-2">🔍</span>
                   <form onSubmit={executeGlobalSearch} className="flex-1 flex gap-2">
@@ -386,7 +384,7 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
                   )}
                 </div>
 
-                {/* --- CONTROLES DE PÁGINA (LIMPADO) --- */}
+                {/* CONTROLES DE PÁGINA */}
                 <div className="flex items-center gap-3 bg-slate-800 p-2 rounded-full border border-slate-700 shadow-md">
                   <button onClick={goToPrevPage} disabled={moduleData.data.page <= 1} className="w-8 h-8 bg-slate-700 hover:bg-slate-600 rounded-full disabled:opacity-50 flex items-center justify-center">◀</button>
                   <div className="flex items-center gap-2 text-sm text-slate-300 font-mono">
@@ -399,12 +397,11 @@ export function PdfModule({ moduleData, onUpdate }: Props) {
               </div>
             )}
 
-            {/* O Motor React-PDF desenhando na tela */}
             {pdfSource ? (
               <div className="border border-slate-800 shadow-2xl relative bg-white"> 
                 <Document file={pdfSource} onLoadSuccess={onDocumentLoadSuccess}>
                   <Page 
-                    // 👇 O SEGREDO DO CACHE ESTÁ NESTA KEY DINÂMICA 👇
+                    // Chave utilizada para re-renderizar em novas buscas, garantindo que o destaque seja atualizado.
                     key={`page-${moduleData.data.page}-search-${submittedSearch}`}
                     pageNumber={moduleData.data.page} 
                     renderTextLayer={true} 

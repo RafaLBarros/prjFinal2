@@ -29,7 +29,7 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // 👇 A TRAVA ANTI-FANTASMA: Se o item clicado já sumiu do HTML, ignora!
+      // Ignora eventos de elementos que já foram removidos do DOM.
       if (!document.body.contains(event.target as Node)) return;
       
       if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
@@ -71,7 +71,7 @@ export function SearchableSelect({ options, value, onChange, placeholder = "Sele
                 key={option.id}
                 onMouseDown={(e) => {
                   e.preventDefault(); 
-                  e.stopPropagation(); // 👇 NOVA TRAVA: Impede o clique de "vazar" pro menu de trás
+                  e.stopPropagation();
                   onChange(option.id);
                   setIsOpen(false);
                 }}

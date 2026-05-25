@@ -14,7 +14,7 @@ interface SidebarProps {
   onMoveNode: (draggedId: string, targetId: string | null, position: 'before' | 'after' | 'inside') => void;
   onRenameNode: (id: string, newName: string) => void;
   onTogglePin: (id: string) => void;
-  onChangeIcon: (id: string, icon: string) => void; // 👈 NOVA PROP AQUI
+  onChangeIcon: (id: string, icon: string) => void;
   level?: number; 
 }
 
@@ -38,7 +38,7 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
   const [editName, setEditName] = useState(node.name);
   const [dragPosition, setDragPosition] = useState<'before' | 'after' | 'inside' | null>(null);
   
-  // 👈 Controle do Modal de Emoji
+  // Estado para controlar a exibição do seletor de emojis para o ícone personalizado.
   const [showEmojiPicker, setShowEmojiPicker] = useState(false); 
 
   const handleSaveRename = () => {
@@ -161,7 +161,7 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
         )}
       </div>
 
-      {/* 👇 MODAL COM O MOTOR DE EMOJIS PROFISSIONAL 👇 */}
+      {/* Modal para Seleção de Icone. */}
       {showEmojiPicker && (
         <div 
           className="fixed inset-0 z-[100] flex items-center justify-center bg-black/40 backdrop-blur-sm"
@@ -171,9 +171,9 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
             className="flex flex-col items-center animate-in fade-in zoom-in-95 shadow-[0_10px_40px_rgba(0,0,0,0.5)]"
             onClick={e => e.stopPropagation()} 
           >
-            {/* O Componente Mágico da Biblioteca */}
+            {/* Biblioteca Emoji Picker. */}
             <EmojiPicker 
-              theme={Theme.DARK} // Já deixamos no Dark Mode combinando com o Echo Tabula
+              theme={Theme.DARK} // Dark Mode.
               searchPlaceHolder="Buscar ícone..."
               lazyLoadEmojis={true}
               onEmojiClick={(emojiObject) => {
@@ -182,7 +182,7 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
               }}
             />
             
-            {/* O Botão de Remover fica isolado numa barrinha embaixo */}
+            {/* Botão para Remover Ícone. */}
             <div className="mt-2 bg-slate-900 px-4 py-2 rounded-lg border border-slate-700 w-full flex justify-center hover:border-red-500/50 transition-colors">
               <button 
                 onClick={() => { onChangeIcon(node.id, ''); setShowEmojiPicker(false); }} 

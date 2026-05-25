@@ -74,8 +74,7 @@ export function GlobalAudioPlayer() {
   
   const dragRef = useRef<{ startX: number, startY: number, initialX: number, initialY: number } | null>(null);
 
-  // --- NOVA LÓGICA DE MINIMIZAR ANCORADA NA DIREITA ---
-  // w-80 = 320px | w-14 = 56px | Diferença = 264px
+  // Funções para minimizar e expandir o player, ajustando a posição para centralizar minimizado.
   const handleMinimize = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsMinimized(true);
@@ -86,7 +85,7 @@ export function GlobalAudioPlayer() {
     e.stopPropagation();
     if (!hasDraggedOut) {
       setIsMinimized(false);
-      // O Math.max garante que, se estiver muito perto da borda esquerda, não vai vazar da tela
+      // O Math.max garante que, se estiver muito perto da borda esquerda, não vai vazar da tela.
       setPosition(prev => ({ ...prev, x: Math.max(0, prev.x - 264) }));
     }
   };
@@ -144,7 +143,7 @@ export function GlobalAudioPlayer() {
   }, [isMinimized]);
 
 
-  // 1. O PULSO & A COLINHA NA MEMÓRIA SÍNCRONA
+  //Toda vez que as trilhas mudarem, avisa os módulos interessados.
   useEffect(() => {
     const playingUrls = tracks.filter(t => t.isPlaying).map(t => t.url);
     (window as any).__globalAudioPlayingUrls = playingUrls;
@@ -156,7 +155,7 @@ export function GlobalAudioPlayer() {
     return () => clearInterval(interval);
   }, [tracks]);
 
-  // 2. A CENTRAL DE EVENTOS
+  // Eventos para controlar as trilhas globalmente a partir dos módulos.
   useEffect(() => {
     const offAdd = moduleEventBus.onAddGlobalTrack(({ url, title, volume, loop, restart }) => {
       setTracks(prev => {

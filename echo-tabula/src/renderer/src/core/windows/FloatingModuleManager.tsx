@@ -19,7 +19,7 @@ interface FloatedItem {
   module: RpgModule;
 }
 
-// O MOTOR INDIVIDUAL DE CADA JANELA FLUTUANTE
+// Janela Flutuante para Módulos.
 function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedItem, tree: CampaignNode[], onUpdateModuleGlobal: any }) {
   const { sceneId, sceneModules, module } = item;
   
@@ -28,7 +28,6 @@ function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedIte
     y: 100 + (Math.random() * 40) 
   });
   
-  // 👇 NOVO: O estado de tamanho agora é controlado pelo React, não pelo CSS
   const [size, setSize] = useState({ w: 500, h: 400 });
 
   const [isDragging, setIsDragging] = useState(false);
@@ -36,18 +35,17 @@ function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedIte
   
   const dragRef = useRef<{ startX: number, startY: number, initialX: number, initialY: number } | null>(null);
   
-  // 👇 NOVO: Referência para a matemática do redimensionamento
   const resizeRef = useRef<{ startX: number, startY: number, startW: number, startH: number, startPosX: number, startPosY: number, dir: string } | null>(null);
 
   const handleMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault(); // 👈 ISSO BLOQUEIA O ARRASTO NATIVO DO NAVEGADOR
+    e.preventDefault();
     setIsDragging(true);
     dragRef.current = { startX: e.clientX, startY: e.clientY, initialX: position.x, initialY: position.y };
   };
 
   const handleResizeStart = (e: React.MouseEvent, dir: string) => {
     e.stopPropagation(); 
-    e.preventDefault(); // 👈 ISSO GARANTE QUE O CLIQUE NA BORDA SEJA SÓ PARA REDIMENSIONAR
+    e.preventDefault();
     setIsResizing(true);
     resizeRef.current = {
       startX: e.clientX,
@@ -62,14 +60,14 @@ function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedIte
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
-      // Lógica de Arrastar (Mover)
+      // Lógica de Arrastar.
       if (isDragging && dragRef.current) {
         setPosition({
           x: Math.max(0, dragRef.current.initialX + (e.clientX - dragRef.current.startX)),
           y: Math.max(0, dragRef.current.initialY + (e.clientY - dragRef.current.startY))
         });
       } 
-      // 👇 NOVA LÓGICA: Redimensionamento Omnidirecional
+      // Redimensionar de acordo com a borda arrastada.
       else if (isResizing && resizeRef.current) {
         const { startX, startY, startW, startH, startPosX, startPosY, dir } = resizeRef.current;
         const dx = e.clientX - startX;
@@ -87,12 +85,12 @@ function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedIte
         if (dir.includes('e')) newW = Math.max(MIN_W, startW + dx);
         // Borda Inferior
         if (dir.includes('s')) newH = Math.max(MIN_H, startH + dy);
-        // Borda Esquerda (Altera a largura E empurra a janela)
+        // Borda Esquerda
         if (dir.includes('w')) {
           newW = Math.max(MIN_W, startW - dx);
           if (newW > MIN_W) newX = startPosX + dx;
         }
-        // Borda Superior (Altera a altura E empurra a janela)
+        // Borda Superior
         if (dir.includes('n')) {
           newH = Math.max(MIN_H, startH - dy);
           if (newH > MIN_H) newY = startPosY + dy;
@@ -139,7 +137,6 @@ function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedIte
         e.currentTarget.style.zIndex = '999';
       }}
     >
-      {/* 👇 AS 8 ALÇAS INVISÍVEIS PARA REDIMENSIONAR 👇 */}
       {/* Bordas Laterais */}
       <div onMouseDown={(e) => handleResizeStart(e, 'n')} className="absolute top-0 left-2 right-2 h-1.5 cursor-n-resize z-50" />
       <div onMouseDown={(e) => handleResizeStart(e, 's')} className="absolute bottom-0 left-2 right-2 h-1.5 cursor-s-resize z-50" />
@@ -151,7 +148,7 @@ function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedIte
       <div onMouseDown={(e) => handleResizeStart(e, 'sw')} className="absolute bottom-0 left-0 w-3 h-3 cursor-sw-resize z-50" />
       <div onMouseDown={(e) => handleResizeStart(e, 'se')} className="absolute bottom-0 right-0 w-3 h-3 cursor-se-resize z-50" />
 
-      {/* CABEÇALHO ARRASTÁVEL */}
+      {/* CABEÇALHO */}
       <div 
         onMouseDown={handleMouseDown}
         className="bg-slate-800 border-b border-slate-700 px-3 py-2 cursor-grab active:cursor-grabbing flex justify-between items-center rounded-t-lg group select-none shrink-0"
@@ -169,7 +166,7 @@ function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedIte
         </button>
       </div>
 
-      {/* ÁREA DE CONTEÚDO (Sem redimensionamento CSS, o React controla o pai agora) */}
+      {/* ÁREA DE CONTEÚDO */}
       <div className="flex-1 overflow-auto bg-slate-900 rounded-b-lg scrollbar-thin scrollbar-thumb-slate-700 relative">
         <div className="p-4 min-w-[768px] min-h-max pointer-events-auto">
           {module.type === 'text' && <TextModule moduleData={module as TextType} allModules={sceneModules} campaignNodes={tree} currentSceneId={sceneId} onUpdate={handleUpdate} />}
@@ -183,10 +180,10 @@ function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedIte
   );
 }
 
-// O GERENCIADOR QUE VASCULHA A ÁRVORE
+// Componente que percorre a arvore para renderizar modulos flutuantes.
 export function FloatingModuleManager({ tree, onUpdateModuleGlobal }: Props) {
   
-  // Função recursiva para achar todos os módulos com 'isFloated: true' em QUALQUER cena
+  // Função recursiva para achar todos os módulos com 'isFloated: true'.
   const getFloatedModules = (nodes: CampaignNode[]): FloatedItem[] => {
     let items: FloatedItem[] = [];
     nodes.forEach(node => {

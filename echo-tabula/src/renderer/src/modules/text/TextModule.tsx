@@ -16,7 +16,7 @@ interface MenuBarProps {
   currentSceneId: string;
 }
 
-// --- SUBCOMPONENTE: A BARRA DE FERRAMENTAS ---
+// Menu de formatação e inserção de links interativos.
 const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSceneId }: MenuBarProps) => {
   const [, forceUpdate] = useState({});
   
@@ -48,7 +48,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
-      // 👇 A TRAVA ANTI-FANTASMA DO MENU PRINCIPAL 👇
       if (!document.body.contains(event.target as Node)) return;
       
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
@@ -78,14 +77,14 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
 
   const selectedModule = availableModules.find(m => m.id === linkTargetId);
 
-  // 👇 ATUALIZADO: Define as ações padrão corretas quando você troca o tipo do módulo
+  // Ajusta as opções do menu de link dinamicamente com base no tipo do módulo selecionado.
   useEffect(() => {
     if (selectedModule?.type === 'audio') {
       setPreventScroll(true);
       setLinkAction('toggle');
     } else if (selectedModule?.type === 'dice_roller') {
       setPreventScroll(false);
-      setLinkAction('rollPreset'); // Padrão: Rolar
+      setLinkAction('rollPreset');
     } else {
       setPreventScroll(false);
       setLinkAction('toggle');
@@ -148,7 +147,7 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
         {showLinkMenu && (
           <div className="absolute top-full mt-2 left-0 w-80 bg-slate-800 border border-slate-600 shadow-[0_15px_50px_rgba(0,0,0,0.8)] rounded-md p-4 z-[2000] flex flex-col gap-3">
             
-            {/* 👇 NOVO: CENA ALVO SEARCHABLE 👇 */}
+            {/* BUSCA DE CENA */}
             <div className="flex flex-col gap-1 relative z-[60]">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><span>📍</span> Cena Alvo:</label>
               <SearchableSelect 
@@ -159,7 +158,7 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
               />
             </div>
 
-            {/* 👇 NOVO: MÓDULO ALVO SEARCHABLE 👇 */}
+            {/* BUSCA DE MÓDULO */}
             <div className="flex flex-col gap-1 relative z-[50]">
               <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider flex items-center gap-1"><span>🧩</span> Módulo Alvo:</label>
               <SearchableSelect 
@@ -200,7 +199,6 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
                 </div>
                 <div>
                   <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mt-2 mb-1">Ação do Link:</label>
-                  {/* Para ações com opções fixas e poucas, o Select é mais rápido e não confunde */}
                   <select value={linkAction} onChange={(e) => setLinkAction(e.target.value)} className="w-full bg-slate-900 border border-slate-600 text-slate-200 text-sm p-1.5 rounded focus:outline-none focus:border-indigo-500 cursor-pointer">
                     <option value="rollPreset">Rolar Imediatamente</option>
                     <option value="focusModule">Apenas Rolar Tela até o Módulo</option>
@@ -289,12 +287,12 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
+// Componente principal do módulo de texto, que inclui o editor e o menu de formatação.
 interface Props {
   moduleData: TextModuleType;
   allModules?: RpgModule[]; 
-  campaignNodes?: CampaignNode[]; // 👈 Nova Propriedade
-  currentSceneId?: string;        // 👈 Nova Propriedade
+  campaignNodes?: CampaignNode[]; 
+  currentSceneId?: string;        
   onUpdate: (id: string, updatedFields: Partial<RpgModule>) => void;
 }
 
@@ -312,7 +310,7 @@ export function TextModule({ moduleData, allModules = [], campaignNodes = [], cu
 
   const [draftName, setDraftName] = useState(moduleData.name);
 
-  // USE EFFECT PARA RENOMEAR O MÓDULO (SINCRONIZANDO O NOME DO INPUT COM O NOME DO MÓDULO)
+  // Sincroniza o nome do módulo com o estado local para edição.
   useEffect(() => {
     setDraftName(moduleData.name);
   }, [moduleData.name]);

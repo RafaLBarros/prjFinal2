@@ -26,7 +26,7 @@ export function EncounterModule({ moduleData, onUpdate }: Props) {
 
   const combatants: Combatant[] = moduleData.data.combatants || [];
 
-  // USE EFFECT PARA RENOMEAR O MÓDULO (SINCRONIZANDO O NOME DO INPUT COM O NOME DO MÓDULO)
+  // Sincroniza o nome do módulo com o estado local para edição.
   useEffect(() => {
     setDraftName(moduleData.name);
   }, [moduleData.name]);
@@ -44,7 +44,7 @@ export function EncounterModule({ moduleData, onUpdate }: Props) {
     }
   };
 
-  // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
+  // Escuta ações globais para abrir o combate e rolar para o turno atual.
 
   useEffect(() => {
     return moduleEventBus.onModuleAction(({ targetId, action }) => {
@@ -313,7 +313,6 @@ export function EncounterModule({ moduleData, onUpdate }: Props) {
               combatants.map((c) => {
                 const isMyTurn = moduleData.data.currentTurnId === c.id;
                 
-                // Lógica de cores baseada 100% na Facção
                 const rowStyle = c.isDefeated 
                   ? 'opacity-40 grayscale border-slate-600 bg-slate-900'
                   : c.faction === 'player' ? 'bg-emerald-900/20 border-emerald-500'

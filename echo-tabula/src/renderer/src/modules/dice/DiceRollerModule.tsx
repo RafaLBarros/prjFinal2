@@ -22,25 +22,21 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [draftName, setDraftName] = useState(moduleData.name);
 
-  // --- ESTADOS DO MOTOR ---
   const [diceCounts, setDiceCounts] = useState<Record<number, number>>({
     4: 0, 6: 0, 8: 0, 10: 0, 12: 0, 20: 0, 100: 0
   });
-  // 👇 FIX 1: O estado agora aceita string vazia para facilitar a digitação
   const [modifier, setModifier] = useState<number | ''>(0);
-  // 👇 FIX 2: O novo estado para controlar a lógica da rolagem
   const [rollMode, setRollMode] = useState<RollMode>('sum'); 
   
   const [isRolling, setIsRolling] = useState(false);
   const [rollResult, setRollResult] = useState<RollResult | null>(null);
 
-  // --- ESTADO DO NOVO PRESET ---
   const [newPresetName, setNewPresetName] = useState('');
 
   const diceFaces = [4, 6, 8, 10, 12, 20, 100];
   const presets: DicePreset[] = moduleData.data.presets || [];
 
-  // USE EFFECT PARA RENOMEAR O MÓDULO (SINCRONIZANDO O NOME DO INPUT COM O NOME DO MÓDULO)
+  // Sincroniza o nome do módulo com o estado local para edição.
   useEffect(() => {
     setDraftName(moduleData.name);
   }, [moduleData.name]);
@@ -58,7 +54,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
     }
   };
 
-  // --- O OUVIDO BIÔNICO (Barramento de Eventos) ---
+  // Ouvinte para ações de rolagem de dados disparadas por presets.
   useEffect(() => {
     return moduleEventBus.onModuleAction(({ targetId, action, payload }) => {
       if (targetId !== moduleData.id) return;
@@ -130,7 +126,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
     });
   }, [moduleData.id, moduleData.isMinimized, presets, onUpdate]); 
 
-  // --- FUNÇÕES DA MESA ---
+  // Funções para manipular a mesa de dados.
   const handleAddDie = (face: number) => {
     setDiceCounts(prev => ({ ...prev, [face]: prev[face] + 1 }));
   };
@@ -143,11 +139,11 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
   const clearTable = () => {
     setDiceCounts({ 4: 0, 6: 0, 8: 0, 10: 0, 12: 0, 20: 0, 100: 0 });
     setModifier(0);
-    setRollMode('sum'); // Reseta para soma padrão
+    setRollMode('sum');
     setRollResult(null);
   };
 
-  // --- FUNÇÕES DE PRESET ---
+  // Funções para manipular presets.
   const hasDiceOnTable = Object.values(diceCounts).some(count => count > 0);
 
   const handleSavePreset = () => {
@@ -158,7 +154,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
       name: newPresetName.trim(),
       dice: { ...diceCounts } as DicePreset['dice'],
       modifier: Number(modifier) || 0,
-      mode: rollMode // 👈 Salva a regra escolhida no preset
+      mode: rollMode 
     };
 
     onUpdate(moduleData.id, {
@@ -178,11 +174,11 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
   const loadPreset = (preset: DicePreset) => {
     setDiceCounts(preset.dice);
     setModifier(preset.modifier);
-    setRollMode(preset.mode || 'sum'); // 👈 Aplica o modo na UI
+    setRollMode(preset.mode || 'sum'); 
     setRollResult(null);
   };
 
-  // --- O MOTOR DE ROLAGEM ---
+  // Função para executar a rolagem de dados, seja por clique ou por preset.
   const executeRoll = () => {
     if (!hasDiceOnTable) return;
 
@@ -207,7 +203,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
         }
       });
 
-      // 👇 MESMA LÓGICA DE CALCULO APLICADA AQUI
+      // Calcula o total base de acordo com o modo selecionado (soma, maior ou menor) e depois aplica o modificador.
       let baseTotal = 0;
       if (rollMode === 'highest') baseTotal = Math.max(...allRolls);
       else if (rollMode === 'lowest') baseTotal = Math.min(...allRolls);
@@ -242,7 +238,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
         .rolling-dice { animation: diceShake 0.3s infinite; }
       `}</style>
 
-      {/* CABEÇALHO PADRONIZADO */}
+      {/* CABEÇALHO */}
       <div className="flex justify-between items-center p-3 border-b border-slate-700/50 bg-slate-800/50">
         <div className="flex items-center gap-2 flex-1">
           <span className="text-indigo-400">🎲</span>
@@ -274,7 +270,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
       {!moduleData.isMinimized && (
         <div className="p-4 flex flex-col gap-5">
           
-          {/* --- A FÁBRICA DE PRESETS --- */}
+          {/* EDITOR DE PRESETS */}
           {isEditing && (
             <div className="bg-slate-900 p-4 rounded border border-slate-700 shadow-inner flex flex-col gap-3">
               <h4 className="text-sm font-bold text-indigo-400 mb-1">Salvar Rolagem Atual</h4>
@@ -326,7 +322,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
             </div>
           )}
 
-          {/* --- A MESA DE DADOS (Área Principal) --- */}
+          {/* MESA DE DADOS */}
           <div className="flex flex-col items-center bg-slate-950 p-6 rounded-xl border border-slate-800 shadow-inner relative">
             
             <button onClick={clearTable} className="absolute top-3 right-3 text-xs text-slate-500 hover:text-red-400 transition underline">
@@ -360,10 +356,10 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
               })}
             </div>
 
-            {/* 👇 PAINEL INFERIOR COM MODO, BÔNUS E BOTÃO */}
+            {/* PAINEL DE CONTROLE */}
             <div className="flex flex-col sm:flex-row items-center gap-3 w-full max-w-2xl bg-slate-900 p-2 sm:rounded-full rounded-xl border border-slate-800 shadow-md">
               
-              {/* O NOVO SELETOR DE MODO */}
+              {/* SELETOR DE MODO */}
               <div className="flex items-center pl-4 gap-2 border-r border-slate-700 pr-3">
                 <span className="text-slate-400 font-bold text-xs uppercase tracking-wider hidden sm:inline">Regra:</span>
                 <select 
@@ -377,7 +373,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
                 </select>
               </div>
 
-              {/* INPUT DE BÔNUS CORRIGIDO */}
+              {/* INPUT DE BÔNUS */}
               <div className="flex items-center gap-2 px-3">
                 <span className="text-slate-400 font-bold text-xs uppercase tracking-wider">Bônus:</span>
                 <input 
@@ -398,7 +394,7 @@ export function DiceRollerModule({ moduleData, onUpdate }: Props) {
               </button>
             </div>
 
-            {/* --- EXIBIÇÃO DO RESULTADO --- */}
+            {/* EXIBIÇÃO DO RESULTADO */}
             {rollResult && !isRolling && (
               <div className="mt-6 w-full max-w-md animate-in zoom-in-95 fade-in duration-200">
                 <div className="bg-indigo-950/40 border border-indigo-500/50 rounded-xl p-4 flex flex-col items-center shadow-[0_0_30px_rgba(99,102,241,0.15)]">

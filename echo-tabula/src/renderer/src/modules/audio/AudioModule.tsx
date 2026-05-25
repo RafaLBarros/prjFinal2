@@ -15,6 +15,7 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
   
   const url = moduleData.data.urlOrPath || "";
 
+  // Sincroniza o nome do módulo com o estado local para edição.
   useEffect(() => {
     setDraftName(moduleData.name);
   }, [moduleData.name]);
@@ -32,7 +33,7 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
     }
   };
 
-  // 👇 LÊ A COLINHA NA INICIALIZAÇÃO! (Fim da amnésia visual) 👇
+  // Status de reprodução global.
   const [isGloballyPlaying, setIsGloballyPlaying] = useState(() => {
     const playingUrls = (window as any).__globalAudioPlayingUrls || [];
     return playingUrls.includes(url);
@@ -54,7 +55,7 @@ export function AudioModule({ moduleData, onUpdate }: Props) {
     }
   }, [moduleData.data.volume, moduleData.data.loop, url]);
 
-  // --- FUNÇÕES DE CONTROLE REMOTO ---
+  // Funções para controlar a reprodução.
   const handlePlayToggle = () => {
     moduleEventBus.toggleGlobalTrack({
       url,
