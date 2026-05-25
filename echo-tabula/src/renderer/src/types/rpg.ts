@@ -1,3 +1,4 @@
+// src/renderer/src/types/rpg.ts
 // ---------------------------------------------------------
 // 1. A BASE (A "Classe Pai")
 // Todos os módulos, não importa quais sejam, SEMPRE terão essas propriedades.

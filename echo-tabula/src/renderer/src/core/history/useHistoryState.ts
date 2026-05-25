@@ -1,4 +1,4 @@
-import { useCallback, useState, Dispatch, SetStateAction } from 'react';
+import { useCallback, useState } from 'react';
 
 interface UseHistoryStateOptions {
   maxHistory?: number;
@@ -25,7 +25,6 @@ export function useHistoryState<T>(
     setFutureStates([]);
   }, [state, maxHistory]);
 
-  type HistorySetter<T> = Dispatch<SetStateAction<T>>;
 
   const setState = useCallback((nextState: T | ((prev: T) => T)) => {
     setStateBase(prev => {
