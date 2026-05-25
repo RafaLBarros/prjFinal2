@@ -1,17 +1,23 @@
 // src/renderer/src/App.tsx
 import { useState, useEffect } from 'react';
 import { Sidebar } from './components/Sidebar';
-// 👇 CORREÇÃO 1: Adicionado o RpgModule na importação 👇
 import { CampaignNode, RpgModule } from './types/rpg';
 import { SceneManager } from './components/SceneManager';
 import { GlobalAudioPlayer } from './components/GlobalAudioPlayer';
-// 👇 CORREÇÃO 2: Importação do nosso novo gerenciador de janelas 👇
 import { FloatingModuleManager } from './components/FloatingModuleManager';
+import { useHistoryState } from './core/history/useHistoryState';
 
 export default function App() {
   
   // A árvore agora começa completamente vazia!
-  const [tree, setTree] = useState<CampaignNode[]>([]);
+  const {
+    state: tree,
+    setState: setTree,
+    takeSnapshot,
+    undo: handleUndo,
+    redo: handleRedo,
+    resetHistory
+  } = useHistoryState<CampaignNode[]>([], { maxHistory: 30 });
 
   const [activeSceneId, setActiveSceneId] = useState<string | null>('s1');
 
@@ -36,44 +42,6 @@ export default function App() {
   // Estado de Importação e Exportação
   const [isProcessingIO, setIsProcessingIO] = useState(false);
 
-  // ========================================================
-  // --- MOTOR DE VIAGEM NO TEMPO (CTRL+Z E CTRL+Y) ---
-  // ========================================================
-  const [pastStates, setPastStates] = useState<CampaignNode[][]>([]);
-  const [futureStates, setFutureStates] = useState<CampaignNode[][]>([]);
-
-  // 1. Tira uma "Foto" da árvore antes de qualquer mudança destrutiva
-  const takeSnapshot = () => {
-    setPastStates(prev => {
-      const newHistory = [...prev, tree];
-      return newHistory.length > 30 ? newHistory.slice(newHistory.length - 30) : newHistory;
-    });
-    setFutureStates([]); 
-  };
-
-  // 2. Volta no tempo
-  const handleUndo = () => {
-    // 👇 Mudança: Lemos o array diretamente do estado limpo
-    if (pastStates.length === 0) return;
-    
-    const previousState = pastStates[pastStates.length - 1];
-    
-    // As atualizações agora são separadas e independentes!
-    setFutureStates(prev => [tree, ...prev]); 
-    setTree(previousState); 
-    setPastStates(prev => prev.slice(0, prev.length - 1)); 
-  };
-
-  // 3. Avança no tempo
-  const handleRedo = () => {
-    if (futureStates.length === 0) return;
-    
-    const nextState = futureStates[0];
-    
-    setPastStates(prev => [...prev, tree]); 
-    setTree(nextState); 
-    setFutureStates(prev => prev.slice(1)); 
-  };
 
   // 4. O Ouvido Global do Teclado
   useEffect(() => {
@@ -99,7 +67,7 @@ export default function App() {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [tree, pastStates, futureStates]); // 👈 AQUI É O SEGREDO: Adicionamos os históricos para o React sempre usar a versão fresquinha!
+  }, [handleUndo, handleRedo]);
 
 
 
@@ -114,6 +82,7 @@ export default function App() {
           try {
             const loadedTree = JSON.parse(result.content);
             setTree(loadedTree);
+            resetHistory();
             setCurrentFile(lastFile);
             setActiveSceneId(null);
           } catch (e) {
@@ -434,6 +403,7 @@ export default function App() {
     
     if (result.success && result.fileName) {
       setTree(emptyTree);
+      resetHistory();
       setActiveSceneId(null);
       setCurrentFile(result.fileName);
       setIsSaveOpen(false);
@@ -456,6 +426,7 @@ export default function App() {
       try {
         const loadedTree = JSON.parse(result.content);
         setTree(loadedTree);
+        resetHistory();
         setCurrentFile(fileName);
         setActiveSceneId(null);
         setIsLoadOpen(false);
