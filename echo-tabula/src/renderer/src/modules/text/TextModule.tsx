@@ -1,4 +1,4 @@
-// src/renderer/src/components/TextModule.tsx
+// src/renderer/src/modules/text/TextModule.tsx
 import { useState, useEffect, useRef } from 'react';
 import { TextModule as TextModuleType, RpgModule, CampaignNode } from '../../types/rpg';
 import { useEditor, EditorContent, Editor } from '@tiptap/react';

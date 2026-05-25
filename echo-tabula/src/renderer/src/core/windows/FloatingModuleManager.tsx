@@ -1,4 +1,5 @@
-// src/renderer/src/components/FloatingModuleManager.tsx
+// src/renderer/src/core/windows/FloatingModuleManager.tsx
+
 import { useState, useEffect, useRef } from 'react';
 import { CampaignNode, RpgModule, TextModule as TextType, AudioModule as AudioType, PdfCropModule as PdfType, EncounterModule as EncounterType, DiceRollerModule as DiceRollerType } from '../../types/rpg';
 import { TextModule } from '../../modules/text';

@@ -1,4 +1,4 @@
-// src/renderer/src/components/AudioModule.tsx
+// src/renderer/src/modules/audio/AudioModule.tsx
 import { AudioModule as AudioModuleType, RpgModule } from '../../types/rpg';
 import { useState, useEffect } from 'react';
 import { moduleEventBus } from '../../core/events/moduleEventBus';

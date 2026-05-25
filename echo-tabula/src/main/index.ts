@@ -9,7 +9,7 @@ import icon from '../../resources/icon.png?asset'
 import fs from 'fs/promises'
 import AdmZip from 'adm-zip';
 
-// 1. ELEVAÇÃO DE PRIVILÉGIOS (Apenas o protocolo local do cofre)
+// Registro do protocolo local usado para servir arquivos do cofre da aplicação.
 protocol.registerSchemesAsPrivileged([
   {
     scheme: 'rpg',
@@ -23,8 +23,7 @@ protocol.registerSchemesAsPrivileged([
   }
 ])
 
-//FUNÇÃO AUXILIAR: Garante que o nome do arquivo seja seguro para o sistema de arquivos, evitando caracteres proibidos e garantindo a extensão .json
-
+// Sanitiza nomes de arquivos JSON usados nas campanhas.
 function sanitizeJsonFileName(fileName: string): string {
   const base = basename(fileName)
   const withoutInvalidChars = base.replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
@@ -33,7 +32,7 @@ function sanitizeJsonFileName(fileName: string): string {
     : `${withoutInvalidChars}.json`
 }
 
-// --- INÍCIO DA NOSSA API DE ARQUIVOS ---
+// IPC: operações básicas de arquivos.
 ipcMain.handle('dialog:openFile', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     properties: ['openFile'],
@@ -94,7 +93,7 @@ ipcMain.handle('fs:importAsset', async () => {
   }
 })
 
-// NOVO OUVINTE: IMPORTAR PDF
+// IPC: importação de mídia para o cofre local.
 ipcMain.handle('fs:importPdf', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Importar Livro/PDF',
@@ -121,7 +120,6 @@ ipcMain.handle('fs:importPdf', async () => {
   }
 })
 
-// OUVINTE: IMPORTAR IMAGEM
 ipcMain.handle('fs:importImage', async () => {
   const { canceled, filePaths } = await dialog.showOpenDialog({
     title: 'Importar Imagem',
@@ -148,7 +146,6 @@ ipcMain.handle('fs:importImage', async () => {
   }
 })
 
-// --- FIM DA NOSSA API DE ARQUIVOS ---
 
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
@@ -188,7 +185,7 @@ function createWindow(): void {
 app.whenReady().then(async () => {
   electronApp.setAppUserModelId('com.electron')
 
-  // COFRE: Campanhas
+  // IPC: gerenciamento de campanhas.
   ipcMain.handle('fs:listCampaigns', async () => {
     try {
       const campaignsPath = join(app.getPath('userData'), 'campaigns')
@@ -280,10 +277,7 @@ app.whenReady().then(async () => {
     return { success: true, fileName: fileName }
   })
 
-  // =========================================================================
-  // 👇 A EXPORTAÇÃO (COM O DEEP SCANNER CORRIGIDO) 👇
-  // =========================================================================
-
+  // IPC: exportação de campanha em pacote .tabula.
   ipcMain.handle('fs:exportCampaign', async (_, fileName: string, tree: any[]) => {
     try {
       const { canceled, filePath } = await dialog.showSaveDialog({
@@ -302,7 +296,7 @@ app.whenReady().then(async () => {
       
       const findAssetsDeep = (obj: any) => {
         if (typeof obj === 'string') {
-          // Captura links rpg:// perdidos no meio de anotações e descrições
+          // Varre a árvore da campanha em busca de assets referenciados.
           const matches = obj.match(/rpg:\/\/asset\/[^"'\s<>]+|rpg:\/\/\/?[^"'\s<>]+/g)
           if (matches) {
             matches.forEach((m: string) => {
@@ -316,13 +310,11 @@ app.whenReady().then(async () => {
         } else if (Array.isArray(obj)) {
           obj.forEach(findAssetsDeep)
         } else if (obj !== null && typeof obj === 'object') {
-          // 👇 A MÁGICA: Olha direto nas chaves, ignorando se tem rpg:// ou não!
           const keysToCheck = ['filePath', 'urlOrPath', 'url'];
           for (const key of keysToCheck) {
             if (typeof obj[key] === 'string' && obj[key].length > 0) {
               const val = obj[key];
               if (!val.startsWith('http')) {
-                // Remove rpg:// se existir, remove barras residuais e decodifica.
                 let rawName = val.replace(/^rpg:\/\/asset\//i, '');
                 rawName = rawName.replace(/^rpg:\/\//i, '');
                 rawName = rawName.replace(/^\/+/, '');
@@ -331,7 +323,6 @@ app.whenReady().then(async () => {
               }
             }
           }
-          // Desce mais um nível na árvore
           Object.values(obj).forEach(findAssetsDeep)
         }
       }
@@ -361,6 +352,7 @@ app.whenReady().then(async () => {
     }
   })
   
+  // IPC: importação de campanha a partir de pacote .tabula ou .zip.
   ipcMain.handle('fs:importCampaign', async () => {
     try {
       const { canceled, filePaths } = await dialog.showOpenDialog({
@@ -416,10 +408,7 @@ app.whenReady().then(async () => {
     }
   })
 
-  // =========================================================================
-  // 👇 A BLINDAGEM DO PROTOCOLO (O 404 DO REACT-PDF) 👇
-  // =========================================================================
-
+  // Protocolo rpg://asset para leitura segura de arquivos do cofre.
   const userDataPath = app.getPath('userData')
   const assetsVaultPath = join(userDataPath, 'assets')
   await fs.mkdir(assetsVaultPath, { recursive: true }).catch(() => {})
@@ -443,8 +432,7 @@ app.whenReady().then(async () => {
           return decodeURIComponent(url.pathname.replace(/^\/+/, ''))
         }
 
-        // Compatibilidade com formato antigo problemático:
-        // rpg://NOME_DO_ARQUIVO
+        // Compatibilidade com URLs antigas salvas antes da normalização do protocolo.
         return decodeURIComponent(requestUrl
           .replace(/^rpg:\/\//i, '')
           .split('?')[0]
@@ -499,30 +487,27 @@ app.whenReady().then(async () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()
   })
 
-  // --- EVENTOS VISUAIS DO UPDATER ---
+  // Configuração do atualizador automático.
   autoUpdater.logger = log;
   
-  // 👇 AS DUAS REGRAS DE OURO 👇
-  autoUpdater.autoDownload = true; // Permite baixar nos bastidores para não travar a internet
-  autoUpdater.autoInstallOnAppQuit = false; // Proíbe o aplicativo de atualizar escondido quando for fechado!
+  autoUpdater.autoDownload = true; 
+  autoUpdater.autoInstallOnAppQuit = false;
 
   autoUpdater.on('checking-for-update', () => log.info("🔍 Checking for update..."));
   
   autoUpdater.on('update-available', () => {
     log.info("✅ Update available! Downloading in background...");
-    // Removido o dialog.showMessageBox daqui para não interromper o usuário à toa.
   });
   
   autoUpdater.on('update-not-available', () => log.info("❌ No update available"));
   
   autoUpdater.on('error', (err) => {
     log.error("💥 Update error:", err);
-    // Erros silenciosos de rede são comuns, evitamos mostrar popup a menos que seja crítico
   });
   
   autoUpdater.on('download-progress', (progress) => log.info(`📦 Downloading: ${Math.round(progress.percent)}%`));
   
-  // 👇 A NOVA LÓGICA DE INSTALAÇÃO CONSCIENTE 👇
+  // Instalação da atualização somente após confirmação do usuário.
   autoUpdater.on('update-downloaded', async (info) => {
     log.info("🎉 Update downloaded!");
     
@@ -538,8 +523,6 @@ app.whenReady().then(async () => {
 
     if (result.response === 0) {
       log.info("Iniciando instalação visual...");
-      // quitAndInstall(isSilent, isForceRunAfter)
-      // Passando "false" no primeiro argumento, nós forçamos o Windows a mostrar a barrinha verde de progresso!
       autoUpdater.quitAndInstall(false, true);
     } else {
       log.info("Usuário escolheu adiar a atualização.");

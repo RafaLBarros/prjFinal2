@@ -1,4 +1,4 @@
-// src/renderer/src/components/GlobalAudioPlayer.tsx
+// src/renderer/src/core/audio/GlobalAudioPlayer.tsx
 import { useState, useEffect, useRef } from 'react';
 import { moduleEventBus } from '../events/moduleEventBus';
 

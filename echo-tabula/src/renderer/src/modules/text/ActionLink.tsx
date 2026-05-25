@@ -1,4 +1,4 @@
-// src/renderer/src/components/ActionLink.tsx
+// src/renderer/src/modules/text/ActionLink.tsx
 import { Node, mergeAttributes } from '@tiptap/core';
 import { ReactNodeViewRenderer, NodeViewWrapper } from '@tiptap/react';
 import { moduleEventBus } from '../../core/events/moduleEventBus';

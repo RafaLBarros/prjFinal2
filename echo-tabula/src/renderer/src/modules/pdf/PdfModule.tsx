@@ -1,4 +1,5 @@
-// src/renderer/src/components/PdfModule.tsx
+// src/renderer/src/modules/pdf/PdfModule.tsx
+
 import { PdfCropModule as PdfModuleType, RpgModule } from '../../types/rpg';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';

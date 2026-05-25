@@ -1,4 +1,5 @@
-// src/renderer/src/components/DiceRollerModule.tsx
+// src/renderer/src/modules/dice/DiceRollerModule.tsx
+
 import { DiceRollerModule as DiceModuleType, RpgModule, DicePreset } from '../../types/rpg';
 import { useState, useEffect } from 'react';
 import { moduleEventBus } from '../../core/events/moduleEventBus';

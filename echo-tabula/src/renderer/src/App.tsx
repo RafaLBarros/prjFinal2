@@ -10,7 +10,7 @@ import { moduleEventBus } from './core/events/moduleEventBus';
 
 export default function App() {
   
-  // A árvore agora começa completamente vazia!
+  // Estado principal da campanha com suporte a histórico.
   const {
     state: tree,
     setState: setTree,
@@ -22,14 +22,14 @@ export default function App() {
 
   const [activeSceneId, setActiveSceneId] = useState<string | null>('s1');
 
-  // --- NOVOS ESTADOS DO GERENCIADOR DE CAMPANHA ---
+  // Estados de gerenciamento da campanha.
   const [currentFile, setCurrentFile] = useState<string | null>(null); 
   const [isLoadOpen, setIsLoadOpen] = useState(false);
   const [isSaveOpen, setIsSaveOpen] = useState(false);
   const [campaignList, setCampaignList] = useState<string[]>([]);
   const [newSaveName, setNewSaveName] = useState('');
 
-  // Status visual para o usuário saber que está seguro
+  // Status visual do salvamento automático.
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   const [saveError, setSaveError] = useState(''); 
@@ -37,14 +37,14 @@ export default function App() {
   const [campaignToDelete, setCampaignToDelete] = useState<string | null>(null);
   const [editingCampaignName, setEditingCampaignName] = useState('');
 
-// 👇 NOVO: Guarda o ID do item que o usuário quer excluir na sidebar
+  // Item da árvore aguardando confirmação de exclusão.
   const [nodeToDelete, setNodeToDelete] = useState<string | null>(null);
 
-  // Estado de Importação e Exportação
+  // Estado de Importação e Exportação.
   const [isProcessingIO, setIsProcessingIO] = useState(false);
 
 
-  // 4. O Ouvido Global do Teclado
+  // Atalhos globais de undo/redo.
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       const activeEl = document.activeElement;
@@ -72,7 +72,7 @@ export default function App() {
 
 
 
-  // --- O DESPERTADOR (AUTO-LOAD NO INÍCIO) ---
+  // Carrega automaticamente a última campanha aberta.
   useEffect(() => {
     const loadLastCampaign = async () => {
       const lastFile = localStorage.getItem('lastCampaign');
@@ -97,7 +97,7 @@ export default function App() {
     loadLastCampaign();
   }, []); 
 
-  // --- O MOTOR DO AUTO-SAVE (DEBOUNCE) CORRIGIDO ---
+  // Salvamento automático com debounce.
   useEffect(() => {
     if (!currentFile) return;
 
@@ -116,7 +116,7 @@ export default function App() {
     return () => clearTimeout(timeoutId);
   }, [tree]); 
 
-  // Garante que o input de renomear esteja sempre atualizado com o arquivo atual
+  // Garante que o input de renomear esteja sempre atualizado com o arquivo atual.
   useEffect(() => {
     if (currentFile) {
       setEditingCampaignName(currentFile.replace('.json', ''));
@@ -281,7 +281,7 @@ export default function App() {
     setNodeToDelete(null);
   };
 
-  // --- FUNÇÃO AUXILIAR: DETECTOR DE PARADOXO ---
+  // Impede mover uma pasta para dentro de seus próprios descendentes.
   const isDescendant = (treeNodes: CampaignNode[], draggedId: string, targetId: string): boolean => {
     const findNode = (nodes: CampaignNode[], id: string): CampaignNode | null => {
       for (const node of nodes) {
@@ -598,16 +598,16 @@ export default function App() {
     });
   };
 
-  // 👇 CORREÇÃO 3: Função Global usando o setTree correto! 👇
+  // Atualiza módulos renderizados em janelas flutuantes.
   const handleUpdateModuleGlobal = (sceneId: string, moduleId: string, updatedFields: Partial<RpgModule>) => {
     setTree(prevNodes => {
-      const newTree = JSON.parse(JSON.stringify(prevNodes)); // Cópia segura da árvore
+      const newTree = JSON.parse(JSON.stringify(prevNodes)); // Cópia profunda para evitar mutação direta do estado.
       
       const updateNode = (nodes: CampaignNode[]) => {
         for (let node of nodes) {
           if (node.id === sceneId && node.type === 'scene' && node.modules) {
             node.modules = node.modules.map(m => m.id === moduleId ? ({ ...m, ...updatedFields } as RpgModule) : m);
-            return true; // Achou e atualizou! Para a busca.
+            return true; // Interrompe a busca após atualizar o módulo.
           }
           if (node.children && updateNode(node.children)) return true;
         }
@@ -627,7 +627,7 @@ export default function App() {
       <div className="w-64 bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
         <div className="p-4 border-b border-slate-800 flex flex-col gap-4 relative">
           
-          {/* 👇 O FANTASMA DO SALVAMENTO FLUTUANDO NO TOPO 👇 */}
+          {/* Indicador visual de salvamento e operações de arquivo */}
           <div className="absolute -top-1 left-1/2 -translate-x-1/2 flex items-center justify-center pointer-events-none mt-1">
             {saveStatus === 'saving' && <span className="text-[10px] bg-slate-900/80 px-2 rounded-full text-emerald-400 animate-pulse font-medium shadow">Salvando...</span>}
             {saveStatus === 'saved' && <span className="text-[10px] bg-slate-900/80 px-2 rounded-full text-slate-500 font-medium">Salvo</span>}
@@ -835,7 +835,7 @@ export default function App() {
         </div>
       )}
 
-      {/* 👇 NOVO MODAL: Confirmação de Exclusão da Barra Lateral 👇 */}
+      {/* Modal de confirmação para exclusão de item da árvore */}
       {nodeToDelete && (
         <div className="absolute inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center">
           <div className="bg-slate-900 border border-slate-700 p-6 rounded-xl shadow-2xl w-96 flex flex-col gap-4 animate-in zoom-in-95">
@@ -864,13 +864,13 @@ export default function App() {
         </div>
       )}
 
-      {/* 👇 CORREÇÃO 4: A nossa central de janelas flutuantes foi plugada aqui! 👇 */}
+      {/* Gerenciador global de janelas flutuantes */}
       <FloatingModuleManager 
         tree={tree} 
         onUpdateModuleGlobal={handleUpdateModuleGlobal} 
       />
 
-      {/* O MINI-PLAYER DO SPOTIFY FICA AQUI */}
+      {/* Player global de áudio */}
       <GlobalAudioPlayer />
 
     </div>
