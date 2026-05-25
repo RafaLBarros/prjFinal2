@@ -9,7 +9,7 @@ interface Props {
 }
 
 export function SceneRenderer({ modules, onUpdateModule }: Props) {
-  // Se a cena não tiver módulos, avisamos o usuário
+  // Se a cena não tiver módulos, avisa o usuário.
   if (!modules || modules.length === 0) {
     return <p className="text-slate-500 italic">Esta cena ainda está vazia.</p>;
   }
@@ -17,7 +17,7 @@ export function SceneRenderer({ modules, onUpdateModule }: Props) {
   return (
     <div className="flex flex-col gap-2 w-full max-w-3xl mx-auto">
       {modules.map((module) => {
-        // A FÁBRICA: Olhamos o 'type' e retornamos o componente correto
+        // Verifica o type e retorna o componente correto para cada módulo. Se for um tipo desconhecido, mostra um aviso.
         switch (module.type) {
           case 'text':
             return <TextModule key={module.id} moduleData={module} onUpdate={onUpdateModule} />; // <-- Repassamos

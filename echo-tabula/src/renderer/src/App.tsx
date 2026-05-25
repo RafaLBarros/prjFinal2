@@ -197,8 +197,8 @@ export default function App() {
     });
   }, [activeSceneId, tree]);
 
-  // --- FUNÇÕES DE CONTROLE DA ÁRVORE ---
-
+  
+  // Controle das pastas e cenas.
   const handleToggleFolder = (targetId: string) => {
     const toggleNode = (nodes: CampaignNode[]): CampaignNode[] => {
       return nodes.map(node => {
@@ -249,12 +249,12 @@ export default function App() {
     });
   };
 
-  // 1. Apenas abre o modal de confirmação
+  //Abre o modal de confirmação.
   const handleDeleteNode = (targetId: string) => {
     setNodeToDelete(targetId);
   };
 
-  // 2. Executa a exclusão de fato
+  //Executa a exclusão.
   const executeDeleteNode = () => {
     if (!nodeToDelete) return;
 
@@ -309,7 +309,7 @@ export default function App() {
     return checkChildren(draggedNode.children);
   };
 
-  // --- FUNÇÃO ATUALIZADA: MOVER NÓ COM REORDENAÇÃO ---
+  // Função de mover um nó para uma nova posição na árvore.
   const handleMoveNode = (
     draggedId: string,
     targetId: string | null,
@@ -420,7 +420,7 @@ export default function App() {
     });
   };
 
-  // --- FUNÇÕES DE GERENCIAMENTO DE CAMPANHA ---
+  // Funções de gerenciamento de campanhas.
 
   const handleNewCampaignClick = () => {
     setNewSaveName('');
@@ -551,7 +551,7 @@ export default function App() {
     });
   };
 
-  // --- FUNÇÕES DE EXPORTAÇÃO E IMPORTAÇÃO ---
+  // Funções de Exportação e Importação de Campanha.
   const handleExportCampaign = async () => {
     if (!currentFile) return;
     
@@ -573,7 +573,7 @@ export default function App() {
     setIsProcessingIO(false);
     
     if (result.success && result.fileName) {
-      // Se importou com sucesso, já carregamos a campanha na tela para o mestre ver!
+      // Se importou com sucesso, carregamos a campanha na tela.
       executeLoad(result.fileName);
     } else if (result.error !== 'Cancelado pelo usuário') {
       alert(`Erro ao importar: ${result.error}`);

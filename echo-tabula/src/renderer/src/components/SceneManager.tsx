@@ -7,7 +7,7 @@ import { EncounterModule } from '../modules/encounter';
 import { DiceRollerModule } from '../modules/dice';
 import { useState } from 'react';
 
-// IMPORTAÇÕES DO DND-KIT
+// Imports do DnD Kit (Drag and Drop).
 import { 
   DndContext, 
   closestCenter, 
@@ -36,9 +36,7 @@ interface Props {
   onRenameScene: (sceneId: string, newName: string) => void;
 }
 
-// ============================================================================
-// COMPONENTE WRAPPER: O Item Ordenável (Sortable Module)
-// ============================================================================
+// Componente que envolve cada módulo para torná-lo "arrastável" e "ordenável".
 function SortableModuleWrapper({ 
   mod, 
   allModules,
@@ -91,7 +89,7 @@ function SortableModuleWrapper({
   return (
     <div ref={setNodeRef} style={style} className={`flex items-start gap-2 group transition-all duration-300 rounded-lg ${isDragging ? 'ring-2 ring-emerald-500/50 shadow-2xl scale-[1.01]' : ''}`}>
       
-      {/* --- A ALÇA DE ARRASTAR (GRIP) --- */}
+      {/* Alça para Movimentar o Módulo. */}
       <div 
         {...attributes} 
         {...listeners} 
@@ -168,13 +166,11 @@ function SortableModuleWrapper({
   );
 }
 
-// ============================================================================
-// GERENCIADOR DE CENA PRINCIPAL
-// ============================================================================
+// Componente Principal de Gerenciamento da Cena, onde os módulos são listados e organizados.
 export function SceneManager({ scene, campaignNodes, onUpdateModules, onRenameScene }: Props) {
   const modules = scene.modules || [];
 
-  // --- CRUD BÁSICO ---
+  // Crud de Módulos.
   const handleUpdateModule = (moduleId: string, updatedFields: Partial<RpgModule>) => {
     const newModules = modules.map(mod => mod.id === moduleId ? { ...mod, ...updatedFields } as RpgModule : mod);
     onUpdateModules(scene.id, newModules);
@@ -198,7 +194,7 @@ export function SceneManager({ scene, campaignNodes, onUpdateModules, onRenameSc
     onUpdateModules(scene.id, [...modules, newModule]);
   };
 
-  // --- CONTROLE DE ESTADOS LOCAIS ---
+  // Estados para controle de exclusão e arrastar.
   const [moduleToDelete, setModuleToDelete] = useState<string | null>(null);
   const [activeDragId, setActiveDragId] = useState<string | null>(null);
 
@@ -211,7 +207,7 @@ export function SceneManager({ scene, campaignNodes, onUpdateModules, onRenameSc
     return false;
   };
 
-  // --- CONFIGURAÇÃO DO DND-KIT ---
+  // Configuração do DnD Kit para arrastar e soltar os módulos.
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 5 } }), 
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
@@ -233,7 +229,7 @@ export function SceneManager({ scene, campaignNodes, onUpdateModules, onRenameSc
     }
   };
 
-  // Define qual módulo está voando agora (para criar a sombra no DragOverlay)
+  // Define qual módulo está sendo arrastado.
   const activeModule = modules.find(m => m.id === activeDragId);
 
   return (
