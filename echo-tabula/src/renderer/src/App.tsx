@@ -309,7 +309,7 @@ export default function App() {
     return checkChildren(draggedNode.children);
   };
 
-  // Função de mover um nó para uma nova posição na árvore.
+  // Move um item da árvore preservando a hierarquia da campanha.
   const handleMoveNode = (
     draggedId: string,
     targetId: string | null,

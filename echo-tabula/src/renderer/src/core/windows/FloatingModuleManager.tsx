@@ -183,7 +183,7 @@ function FloatingWindow({ item, tree, onUpdateModuleGlobal }: { item: FloatedIte
 // Componente que percorre a arvore para renderizar modulos flutuantes.
 export function FloatingModuleManager({ tree, onUpdateModuleGlobal }: Props) {
   
-  // Função recursiva para achar todos os módulos com 'isFloated: true'.
+  // Localiza recursivamente módulos desencaixados na árvore da campanha.
   const getFloatedModules = (nodes: CampaignNode[]): FloatedItem[] => {
     let items: FloatedItem[] = [];
     nodes.forEach(node => {

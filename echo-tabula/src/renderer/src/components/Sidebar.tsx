@@ -113,7 +113,7 @@ function SidebarNode({ node, props }: { node: CampaignNode, props: SidebarProps 
       >
         <div className="flex items-center gap-2 truncate overflow-hidden w-full">
           
-          {/* 👇 ÍCONE CLICÁVEL 👇 */}
+          {/* Ícone customizável do item */}
           <span 
             className={`text-sm shrink-0 transition-transform ${!isEditing ? 'cursor-pointer hover:scale-125 hover:drop-shadow-md' : 'pointer-events-none opacity-80'}`}
             onClick={(e) => {
@@ -225,7 +225,7 @@ export function Sidebar(props: SidebarProps) {
                 }`}
               >
                 <div className="flex items-center gap-2 truncate">
-                  {/* 👇 REFLETE O ÍCONE CUSTOMIZADO AQUI TAMBÉM 👇 */}
+                  {/* Ícone customizado refletido nos atalhos fixados */}
                   <span className="text-sm shrink-0">{scene.icon || '📌'}</span>
                   <span className="text-sm truncate">{scene.name}</span>
                 </div>
