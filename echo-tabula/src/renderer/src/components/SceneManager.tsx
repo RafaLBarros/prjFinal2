@@ -33,6 +33,7 @@ interface Props {
   scene: CampaignNode;
   campaignNodes: CampaignNode[];
   onUpdateModules: (sceneId: string, newModules: RpgModule[]) => void;
+  onUpdateModulesSilently: (sceneId: string, newModules: RpgModule[]) => void;
   onRenameScene: (sceneId: string, newName: string) => void;
 }
 
@@ -42,7 +43,8 @@ function SortableModuleWrapper({
   allModules,
   campaignNodes,
   currentSceneId,
-  onUpdateModule, 
+  onUpdateModule,
+  onUpdateModuleSilently, 
   onDeleteModule, 
   moduleToDelete, 
   setModuleToDelete,
@@ -53,12 +55,14 @@ function SortableModuleWrapper({
   campaignNodes: CampaignNode[],
   currentSceneId: string,
   onUpdateModule: (id: string, updates: Partial<RpgModule>) => void,
+  onUpdateModuleSilently: (id: string, updates: Partial<RpgModule>) => void,
   onDeleteModule: (id: string) => void,
   moduleToDelete: string | null,
   setModuleToDelete: (id: string | null) => void,
   hasValuableContent: (mod: RpgModule) => boolean
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: mod.id });
+  const [hasOpenOverlay, setHasOpenOverlay] = useState(false);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -107,8 +111,22 @@ function SortableModuleWrapper({
       </div>
 
       {/* --- O MÓDULO EM SI --- */}
-      <div className="flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md z-10 hover:z-30 focus-within:z-[100]">
-        {mod.type === 'text' && <TextModule moduleData={mod as TextType} allModules={allModules} campaignNodes={campaignNodes} currentSceneId={currentSceneId} onUpdate={onUpdateModule} />}
+      <div
+        className={`flex-1 relative min-w-0 transition-transform hover:-translate-y-1 hover:shadow-2xl hover:shadow-emerald-900/10 rounded-md ${
+          hasOpenOverlay ? 'z-[300]' : 'z-10 hover:z-30 focus-within:z-[100]'
+        }`}
+      >
+        {mod.type === 'text' && (
+          <TextModule
+            moduleData={mod as TextType}
+            allModules={allModules}
+            campaignNodes={campaignNodes}
+            currentSceneId={currentSceneId}
+            onUpdate={onUpdateModule}
+            onContentUpdate={onUpdateModuleSilently}
+            onOverlayOpenChange={setHasOpenOverlay}
+          />
+        )}
         {mod.type === 'audio' && <AudioModule moduleData={mod as AudioType} onUpdate={onUpdateModule} />}
         {mod.type === 'pdf_crop' && <PdfModule moduleData={mod as PdfType} onUpdate={onUpdateModule} />}
         {mod.type === 'encounter' && <EncounterModule moduleData={mod as EncounterType} onUpdate={onUpdateModule} />}
@@ -167,13 +185,31 @@ function SortableModuleWrapper({
 }
 
 // Componente Principal de Gerenciamento da Cena, onde os módulos são listados e organizados.
-export function SceneManager({ scene, campaignNodes, onUpdateModules, onRenameScene }: Props) {
+export function SceneManager({
+  scene,
+  campaignNodes,
+  onUpdateModules,
+  onUpdateModulesSilently,
+  onRenameScene
+}: Props) {
+
   const modules = scene.modules || [];
 
   // Crud de Módulos.
   const handleUpdateModule = (moduleId: string, updatedFields: Partial<RpgModule>) => {
     const newModules = modules.map(mod => mod.id === moduleId ? { ...mod, ...updatedFields } as RpgModule : mod);
     onUpdateModules(scene.id, newModules);
+  };
+
+  const handleUpdateModuleSilently = (
+    moduleId: string,
+    updatedFields: Partial<RpgModule>
+  ) => {
+    const newModules = modules.map(mod =>
+      mod.id === moduleId ? { ...mod, ...updatedFields } as RpgModule : mod
+    );
+
+    onUpdateModulesSilently(scene.id, newModules);
   };
 
   const handleDeleteModule = (moduleId: string) => {
@@ -270,6 +306,7 @@ export function SceneManager({ scene, campaignNodes, onUpdateModules, onRenameSc
                   campaignNodes={campaignNodes}
                   currentSceneId={scene.id}
                   onUpdateModule={handleUpdateModule}
+                  onUpdateModuleSilently={handleUpdateModuleSilently}
                   onDeleteModule={handleDeleteModule}
                   moduleToDelete={moduleToDelete}
                   setModuleToDelete={setModuleToDelete}

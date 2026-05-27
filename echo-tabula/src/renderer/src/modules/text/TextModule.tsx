@@ -14,13 +14,30 @@ interface MenuBarProps {
   currentModuleId: string;
   campaignNodes: CampaignNode[];
   currentSceneId: string;
+  onOverlayOpenChange?: (isOpen: boolean) => void;
 }
 
 // Menu de formatação e inserção de links interativos.
-const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSceneId }: MenuBarProps) => {
+const MenuBar = ({
+  editor,
+  allModules,
+  currentModuleId,
+  campaignNodes,
+  currentSceneId,
+  onOverlayOpenChange
+}: MenuBarProps) => {
   const [, forceUpdate] = useState({});
   
   const [showLinkMenu, setShowLinkMenu] = useState(false);
+
+  useEffect(() => {
+    onOverlayOpenChange?.(showLinkMenu);
+
+    return () => {
+      onOverlayOpenChange?.(false);
+    };
+  }, [showLinkMenu, onOverlayOpenChange]);
+
   const [selectedSceneId, setSelectedSceneId] = useState<string>(currentSceneId);
   const [linkTargetId, setLinkTargetId] = useState('');
   const [linkLabel, setLinkLabel] = useState('');
@@ -290,10 +307,12 @@ const MenuBar = ({ editor, allModules, currentModuleId, campaignNodes, currentSc
 // Componente principal do módulo de texto, que inclui o editor e o menu de formatação.
 interface Props {
   moduleData: TextModuleType;
-  allModules?: RpgModule[]; 
-  campaignNodes?: CampaignNode[]; 
-  currentSceneId?: string;        
+  allModules?: RpgModule[];
+  campaignNodes?: CampaignNode[];
+  currentSceneId?: string;
   onUpdate: (id: string, updatedFields: Partial<RpgModule>) => void;
+  onContentUpdate?: (id: string, updatedFields: Partial<RpgModule>) => void;
+  onOverlayOpenChange?: (isOpen: boolean) => void;
 }
 
 const normalizeRpgAssetUrls = (html: string) => {
@@ -306,7 +325,15 @@ const normalizeRpgAssetUrls = (html: string) => {
   })
 }
 
-export function TextModule({ moduleData, allModules = [], campaignNodes = [], currentSceneId = '', onUpdate }: Props) {
+export function TextModule({
+  moduleData,
+  allModules = [],
+  campaignNodes = [],
+  currentSceneId = '',
+  onUpdate,
+  onContentUpdate,
+  onOverlayOpenChange
+}: Props) {
 
   const [draftName, setDraftName] = useState(moduleData.name);
 
@@ -328,6 +355,8 @@ export function TextModule({ moduleData, allModules = [], campaignNodes = [], cu
     }
   };
 
+  const updateContent = onContentUpdate ?? onUpdate;
+
   const editor = useEditor({
     extensions: [
       StarterKit,
@@ -342,7 +371,7 @@ export function TextModule({ moduleData, allModules = [], campaignNodes = [], cu
     onUpdate: ({ editor }) => {
       const normalizedHtml = normalizeRpgAssetUrls(editor.getHTML());
 
-      onUpdate(moduleData.id, {
+      updateContent(moduleData.id, {
         data: {
           ...moduleData.data,
           content: normalizedHtml
@@ -396,6 +425,7 @@ export function TextModule({ moduleData, allModules = [], campaignNodes = [], cu
             currentModuleId={moduleData.id} 
             campaignNodes={campaignNodes} 
             currentSceneId={currentSceneId} 
+            onOverlayOpenChange={onOverlayOpenChange}
           />
           <div className="p-5">
             <EditorContent editor={editor} className="prose prose-invert prose-emerald max-w-none prose-h1:text-2xl prose-h2:text-xl prose-p:text-slate-300" />

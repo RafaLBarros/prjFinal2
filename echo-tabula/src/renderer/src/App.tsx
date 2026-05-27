@@ -551,6 +551,26 @@ export default function App() {
     });
   };
 
+  const handleUpdateSceneModulesSilently = (sceneId: string, newModules: RpgModule[]) => {
+    setTree(prevTree => {
+      const updateModulesInTree = (nodes: CampaignNode[]): CampaignNode[] => {
+        return nodes.map(node => {
+          if (node.id === sceneId && node.type === 'scene') {
+            return { ...node, modules: newModules };
+          }
+
+          if (node.children) {
+            return { ...node, children: updateModulesInTree(node.children) };
+          }
+
+          return node;
+        });
+      };
+
+      return updateModulesInTree(prevTree);
+    });
+  };
+
   // Funções de Exportação e Importação de Campanha.
   const handleExportCampaign = async () => {
     if (!currentFile) return;
@@ -600,7 +620,7 @@ export default function App() {
 
   // Atualiza módulos renderizados em janelas flutuantes.
   const handleUpdateModuleGlobal = (sceneId: string, moduleId: string, updatedFields: Partial<RpgModule>) => {
-    setTree(prevNodes => {
+    commit(prevNodes => {
       const newTree = JSON.parse(JSON.stringify(prevNodes)); // Cópia profunda para evitar mutação direta do estado.
       
       const updateNode = (nodes: CampaignNode[]) => {
@@ -618,6 +638,8 @@ export default function App() {
       return newTree;
     });
   };
+
+  
 
 
   return (
@@ -720,6 +742,7 @@ export default function App() {
             scene={activeScene} 
             campaignNodes={tree} 
             onUpdateModules={handleUpdateSceneModules}
+            onUpdateModulesSilently={handleUpdateSceneModulesSilently}
             onRenameScene={handleRenameNode}
           />
         ) : (
